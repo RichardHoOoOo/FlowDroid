@@ -102,7 +102,6 @@ public class IccRedirectionCreator {
 		SootMethod redirectSM = getRedirectMethod(link);
 		if (redirectSM == null)
 			return;
-
 		// 2) instrument the source to call the generated redirect method after
 		// ICC methods
 		insertRedirectMethodCallAfterIccMethod(link, redirectSM);

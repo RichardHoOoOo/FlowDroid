@@ -273,7 +273,7 @@ public class BackwardsAliasProblem extends AbstractInfoflowProblem {
 
 			@Override
 			public FlowFunction<Abstraction> getCallFlowFunction(final Unit callSite, final SootMethod dest) {
-				if (!dest.isConcrete()) {
+				if (!dest.isConcrete() || !dest.hasActiveBody()) {
 					logger.debug("Call skipped because target has no body: {} -> {}", callSite, dest);
 					return KillAll.v();
 				}

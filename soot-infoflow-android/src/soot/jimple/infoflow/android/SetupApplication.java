@@ -60,6 +60,7 @@ import soot.jimple.infoflow.data.FlowDroidMemoryManager.PathDataErasureMode;
 import soot.jimple.infoflow.entryPointCreators.SimulatedCodeElementTag;
 import soot.jimple.infoflow.handlers.PostAnalysisHandler;
 import soot.jimple.infoflow.handlers.PreAnalysisHandler;
+import soot.jimple.infoflow.handlers.IInstruHandler;
 import soot.jimple.infoflow.handlers.ResultsAvailableHandler;
 import soot.jimple.infoflow.handlers.TaintPropagationHandler;
 import soot.jimple.infoflow.ipc.IIPCManager;
@@ -124,6 +125,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 	protected String callbackFile = "AndroidCallbacks.txt";
 	protected SootClass scView = null;
 
+	protected IInstruHandler instruHandler;
 	protected Set<PreAnalysisHandler> preprocessors = new HashSet<>();
 	protected Set<ResultsAvailableHandler> resultsAvailableHandlers = new HashSet<>();
 	protected TaintPropagationHandler taintPropagationHandler = null;
@@ -574,12 +576,16 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 			return;
 		}
 
+		if(this.instruHandler != null) instruHandler.onBeforeInstru();
+
 		// Do we need ICC instrumentation?
 		if (config.getIccConfig().isIccEnabled()) {
 			if (iccInstrumenter == null)
 				iccInstrumenter = createIccInstrumenter();
 			iccInstrumenter.onBeforeCallgraphConstruction();
 		}
+
+		if(this.instruHandler != null) instruHandler.onAfterInstru();
 
 		// Run the preprocessors
 		for (PreAnalysisHandler handler : this.preprocessors)
@@ -1845,6 +1851,10 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 	public void setCallbackFile(String callbackFile) {
 		this.callbackFile = callbackFile;
+	}
+
+	public void setInstruHandler(IInstruHandler instruHandler) {
+		this.instruHandler = instruHandler;
 	}
 
 	/**

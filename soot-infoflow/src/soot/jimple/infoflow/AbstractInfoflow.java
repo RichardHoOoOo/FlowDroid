@@ -771,10 +771,10 @@ public abstract class AbstractInfoflow implements IInfoflow {
 					logger.error("No sources found, aborting analysis");
 					continue;
 				}
-				if (sinkCount == 0) {
-					logger.error("No sinks found, aborting analysis");
-					continue;
-				}
+				// if (sinkCount == 0) {
+				// 	logger.error("No sinks found, aborting analysis");
+				// 	continue;
+				// }
 				logger.info("Source lookup done, found {} sources and {} sinks.",
 						forwardProblem.getInitialSeeds().size(), sinkCount);
 

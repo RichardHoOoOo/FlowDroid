@@ -1,10 +1,12 @@
 package soot.jimple.infoflow.handlers;
 
 import java.util.Set;
+import java.util.List;
 
 import soot.Unit;
 import soot.jimple.infoflow.InfoflowManager;
 import soot.jimple.infoflow.data.Abstraction;
+import soot.jimple.infoflow.data.AbstractionAtSink;
 
 /**
  * Handler interface for callbacks during taint propagation

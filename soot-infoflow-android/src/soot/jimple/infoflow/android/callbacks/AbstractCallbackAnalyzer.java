@@ -76,6 +76,8 @@ import soot.toolkits.scalar.SimpleLocalDefs;
 import soot.util.HashMultiMap;
 import soot.util.MultiMap;
 
+import java.util.Stack;
+
 /**
  * Analyzes the classes in the APK file to find custom implementations of the
  * well-known Android callback and handler interfaces.
@@ -498,7 +500,7 @@ public abstract class AbstractCallbackAnalyzer {
 			Stmt stmt = (Stmt) u;
 			if (stmt.containsInvokeExpr()) {
 				final String methodName = stmt.getInvokeExpr().getMethod().getName();
-				if (methodName.equals("getFragmentManager") || methodName.equals("getSupportFragmentManager"))
+				if (methodName.equals("getFragmentManager") || methodName.equals("getSupportFragmentManager") || methodName.equals("getChildFragmentManager"))
 					isFragmentManager = true;
 				else if (methodName.equals("beginTransaction"))
 					isFragmentTransaction = true;
@@ -551,14 +553,43 @@ public abstract class AbstractCallbackAnalyzer {
 											.canStoreType(rt, scSupportFragment.getType());
 									addFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy()
 											.canStoreType(rt, scAndroidXFragment.getType());
-									if (addFragment)
-										checkAndAddFragment(method.getDeclaringClass(), rt.getSootClass());
+									if (addFragment) {
+										// https://mailman.cs.mcgill.ca/pipermail/soot-list/2022-May/009310.html
+										// checkAndAddFragment(method.getDeclaringClass(), rt.getSootClass());
+										Set<SootClass> activities = findDeclaringActivities(method, this.entryPointClasses);
+										for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
+									}
 								}
 							}
 						}
 					}
 				}
 			}
+	}
+
+	protected Set<SootClass> findDeclaringActivities(SootMethod method, Set<SootClass> entryPointClasses) {
+		Set<SootClass> activities = new HashSet<>();
+		Stack<SootMethod> stack = new Stack<>();
+		Set<String> visited = new HashSet<>();
+		stack.push(method);
+		while(! stack.isEmpty()) {
+			SootMethod topMtd = stack.pop();
+			if(! visited.add(topMtd.getSignature())) continue;
+			String topClsName = topMtd.getDeclaringClass().getName();
+			String topMtdName = topMtd.getName();
+			SootClass topMtdRtn = null;
+			Type rtnType = topMtd.getReturnType();
+			if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
+			if(topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null && entryPointClasses.contains(topMtdRtn)) activities.add(topMtdRtn);
+			else {
+				Iterator<Edge> edges = Scene.v().getCallGraph().edgesInto(topMtd);
+				while(edges.hasNext()) {
+					Edge edge = edges.next();
+					stack.push(edge.src());
+				}
+			}
+		}
+		return activities;
 	}
 
 	/**
