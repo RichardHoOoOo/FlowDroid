@@ -96,7 +96,7 @@ public class SourceContextAndPath extends SourceContext implements Cloneable {
 			Iterator<Abstraction> it = path.reverseIterator();
 			while (it.hasNext()) {
 				Abstraction a = it.next();
-				if (a == abs)
+				if (a == abs) 
 					return null;
 			}
 		}
