@@ -147,7 +147,7 @@
 				</flow>
 			</flows>
 		</method>
-		<method id="android.content.Intent clone()">
+		<method id="java.lang.Object clone()">
 			<flows>
 				<flow isAlias="false" typeChecking="false">
 					<from sourceSinkType="Field" />

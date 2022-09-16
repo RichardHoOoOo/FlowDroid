@@ -101,8 +101,8 @@ public class App {
 		}
 	}
 
-	public Set<Intent> getIntents() {
-		Set<Intent> intents = new HashSet<Intent>();
+	public List<Intent> getIntents() {
+		List<Intent> intents = new ArrayList<Intent>();
 		for (LoggingPoint p : getLoggingPoints())
 			intents.addAll(p.getIntents());
 		return intents;

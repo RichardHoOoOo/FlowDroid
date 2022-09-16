@@ -35,8 +35,7 @@ public class Ic3Provider implements IccLinkProvider {
 			logger.error("[IccTA] %s is not a valid IC3 model", ic3Model);
 			return iccLinks;
 		}
-
-		Set<Intent> intents = app.getIntents();
+		List<Intent> intents = app.getIntents();
 		for (Intent intent : intents) {
 			if (intent.isImplicit()) {
 				if (null == intent.getAction()) {
@@ -66,7 +65,6 @@ public class Ic3Provider implements IccLinkProvider {
 				if (fromSM != null) {
 					Stmt fromU = linkWithTarget(fromSM, intent.getLoggingPoint().getStmtSequence());
 					IccLink iccLink = new IccLink(fromSM, fromU, Scene.v().getSootClassUnsafe(targetCompName));
-
 					for (Component comp : intent.getApp().getComponentList()) {
 						if (comp.getName().equals(targetCompName)) {
 							iccLink.setExit_kind(comp.getKind().name());

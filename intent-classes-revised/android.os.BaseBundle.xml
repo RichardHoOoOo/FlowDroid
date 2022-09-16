@@ -7,14 +7,6 @@
 				<clear sourceSinkType="Field" AccessPath="[android.os.BaseBundle: java.lang.Object[] values]" />
 			</clears>
 		</method>
-		<method id="java.lang.Object get(java.lang.String)">
-			<flows>
-				<flow isAlias="false" typeChecking="false">
-					<from sourceSinkType="Field" />
-					<to sourceSinkType="Return" />
-				</flow>
-			</flows>
-		</method>
 		<method id="java.util.Set keySet()">
 			<flows>
 				<flow isAlias="false">

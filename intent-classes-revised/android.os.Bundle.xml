@@ -47,7 +47,7 @@
 				<clear sourceSinkType="Field" AccessPath="[java.util.Set: java.lang.Object[] values]" />
 			</clears>
 		</method>
-		<method id="android.os.Bundle clone()">
+		<method id="java.lang.Object clone()">
 			<flows>
 				<flow isAlias="false">
 					<from sourceSinkType="Field" />

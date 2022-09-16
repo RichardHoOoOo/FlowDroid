@@ -53,16 +53,19 @@ public class IccInstrumenter implements PreAnalysisHandler {
 	public void onBeforeCallgraphConstruction() {
 		logger.info("[IccTA] Launching IccTA Transformer...");
 
-		logger.info("[IccTA] Loading the ICC Model...");
-		Ic3Provider provider = new Ic3Provider(iccModel);
-		List<IccLink> iccLinks = provider.getIccLinks();
-		logger.info("[IccTA] ...End Loading the ICC Model");
-
 		// Create the redirection creator
 		if (redirectionCreator == null)
 			redirectionCreator = new IccRedirectionCreator(dummyMainClass, componentToEntryPoint);
 		else
 			redirectionCreator.undoInstrumentation();
+
+		// Remove any potential leftovers from the last last instrumentation
+		undoInstrumentation();
+		
+		logger.info("[IccTA] Loading the ICC Model...");
+		Ic3Provider provider = new Ic3Provider(iccModel);
+		List<IccLink> iccLinks = provider.getIccLinks();
+		logger.info("[IccTA] ...End Loading the ICC Model");
 
 		logger.info("[IccTA] Lauching ICC Redirection Creation...");
 		for (IccLink link : iccLinks) {
@@ -71,9 +74,6 @@ public class IccInstrumenter implements PreAnalysisHandler {
 			}
 			redirectionCreator.redirectToDestination(link);
 		}
-
-		// Remove any potential leftovers from the last last instrumentation
-		undoInstrumentation();
 
 		// Instrument the messenger class
 		instrumentMessenger();
