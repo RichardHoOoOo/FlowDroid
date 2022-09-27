@@ -133,6 +133,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 	protected IInPlaceInfoflow infoflow = null;
 
+	protected List<String> activityNames = null;
+
+	public void setActivityNames(List<String> activityNames) {
+		this.activityNames = activityNames;
+	}
+
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -664,6 +670,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		jimpleClass.addCallbackFilter(new AlienHostComponentFilter(entrypoints));
 		jimpleClass.addCallbackFilter(new ApplicationCallbackFilter(entrypoints));
 		jimpleClass.addCallbackFilter(new UnreachableConstructorFilter());
+		jimpleClass.setActivityNames(this.activityNames);
 		jimpleClass.collectCallbackMethods();
 
 		// Find the user-defined sources in the layout XML files. This
@@ -961,7 +968,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					Set<SootClass> fragments = lfp.getFragments().get(layoutFileName);
 					if (fragments != null) {
 						for (SootClass fragment : fragments) {
-							if (fragmentClasses.put(callbackClass, fragment))
+							if (fragmentClasses.put(callbackClass, fragment)) 
 								hasNewCallback = true;
 						}
 					}
@@ -1017,6 +1024,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 				: new FastCallbackAnalyzer(config, entryPointClasses, callbackClasses);
 		if (valueProvider != null)
 			jimpleClass.setValueProvider(valueProvider);
+		jimpleClass.setActivityNames(this.activityNames);
 		jimpleClass.collectCallbackMethods();
 
 		// Collect the results

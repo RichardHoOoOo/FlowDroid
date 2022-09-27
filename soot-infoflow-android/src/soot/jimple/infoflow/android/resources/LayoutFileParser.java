@@ -259,7 +259,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 		else if (tname.equals("merge")) {
 			// do not consider any attributes of this elements, just
 			// continue with the children
-		} else if (tname.equals("fragment")) {
+		} else if (tname.equals("fragment") || tname.equals("androidx.fragment.app.FragmentContainerView")) {
 			final AXmlAttribute<?> attr = rootNode.getAttribute("name");
 			// final AXmlAttribute<?> attrID = rootNode.getAttribute("id");
 			if (attr == null)

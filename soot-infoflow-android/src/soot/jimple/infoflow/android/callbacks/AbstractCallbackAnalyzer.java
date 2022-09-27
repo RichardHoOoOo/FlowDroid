@@ -108,9 +108,6 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final SootClass scSupportFragment = Scene.v().getSootClassUnsafe("android.support.v4.app.Fragment");
 	protected final SootClass scAndroidXFragment = Scene.v().getSootClassUnsafe("androidx.fragment.app.Fragment");
 
-	protected final SootClass scSupportViewPager = Scene.v().getSootClassUnsafe("android.support.v4.view.ViewPager");
-	protected final SootClass scAndroidXViewPager = Scene.v().getSootClassUnsafe("androidx.viewpager.widget.ViewPager");
-
 	protected final SootClass scFragmentStatePagerAdapter = Scene.v()
 			.getSootClassUnsafe("android.support.v4.app.FragmentStatePagerAdapter");
 	protected final SootClass scFragmentPagerAdapter = Scene.v()
@@ -121,6 +118,9 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final SootClass scAndroidXFragmentPagerAdapter = Scene.v()
 			.getSootClassUnsafe("androidx.fragment.app.FragmentPagerAdapter");
 
+	protected final SootClass scAndroidXFragmentStateAdapter = Scene.v()
+			.getSootClassUnsafe("androidx.viewpager2.adapter.FragmentStateAdapter");
+
 	protected final InfoflowAndroidConfiguration config;
 	protected final Set<SootClass> entryPointClasses;
 	protected final Set<String> androidCallbacks;
@@ -130,12 +130,17 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final Set<SootClass> dynamicManifestComponents = new HashSet<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClasses = new HashMultiMap<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClassesRev = new HashMultiMap<>();
-	protected final Map<SootClass, Integer> fragmentIDs = new HashMap<>();
 
 	protected final List<ICallbackFilter> callbackFilters = new ArrayList<>();
 	protected final Set<SootClass> excludedEntryPoints = new HashSet<>();
 
 	protected IValueProvider valueProvider = new SimpleConstantValueProvider();
+
+	protected List<String> activityNames = null;
+
+	public void setActivityNames(List<String> activityNames) {
+		this.activityNames = activityNames;
+	}
 
 	protected LoadingCache<SootField, List<Type>> arrayToContentTypes = CacheBuilder.newBuilder()
 			.build(new CacheLoader<SootField, List<Type>>() {
@@ -316,12 +321,15 @@ public abstract class AbstractCallbackAnalyzer {
 						if (!SystemClassHandler.v()
 								.isClassInSystemPackage(iinv.getMethod().getDeclaringClass().getName()))
 							continue;
+
+						// Apply some rules to check a listener must be registered by specific method calls
+						if(! matchCorrespondingRegisterMethod(iinv.getMethod(), (RefType) type)) continue;
+
 						// We have a formal parameter type that corresponds to one of the Android
 						// callback interfaces. Look for definitions of the parameter to estimate the
 						// actual type.
 						if (arg instanceof Local) {
-							Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) arg)
-									.possibleTypes();
+							Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) arg).possibleTypes();
 							for (Type possibleType : possibleTypes) {
 								RefType baseType;
 								if (possibleType instanceof RefType)
@@ -362,9 +370,28 @@ public abstract class AbstractCallbackAnalyzer {
 			}
 		}
 
+		Set<SootClass> components = findDeclaringComponents(method);
 		// Analyze all found callback classes
 		for (SootClass callbackClass : callbackClasses)
-			analyzeClassInterfaceCallbacks(callbackClass, callbackClass, lifecycleElement);
+			for(SootClass component: components)
+				analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
+	}
+
+	/**
+	 * limit that the listener can only be registered by the registerMethod
+	 */
+	private boolean matchCorrespondingRegisterMethod(SootMethod registerMethod, RefType listenerType) {
+		String listenerTypeStr = listenerType.getSootClass().getName();
+		if(listenerTypeStr.equals("android.support.v4.view.PagerAdapter") 
+		|| listenerTypeStr.equals("androidx.viewpager.widget.PagerAdapter")
+		|| listenerTypeStr.equals("androidx.recyclerview.widget.RecyclerView$Adapter")) {
+			String registerMethodSig = registerMethod.getSignature();
+			if(registerMethodSig.equals("<androidx.viewpager.widget.ViewPager: void setAdapter(androidx.viewpager.widget.PagerAdapter)>") 
+			|| registerMethodSig.equals("<android.support.v4.view.ViewPager: void setAdapter(android.support.v4.view.PagerAdapter)>")
+			|| registerMethodSig.equals("<androidx.viewpager2.widget.ViewPager2: void setAdapter(androidx.recyclerview.widget.RecyclerView$Adapter)>")) return true;
+			else return false;
+		}
+		return true;
 	}
 
 	/**
@@ -484,80 +511,40 @@ public abstract class AbstractCallbackAnalyzer {
 	 * @param method The method to check
 	 */
 	protected void analyzeMethodForFragmentTransaction(SootClass lifecycleElement, SootMethod method) {
-		if (scFragment == null || scFragmentTransaction == null)
-			if (scSupportFragment == null || scSupportFragmentTransaction == null)
-				if (scAndroidXFragment == null || scAndroidXFragmentTransaction == null)
-					return;
-		if (!method.isConcrete() || !method.hasActiveBody())
-			return;
+		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName())) return;
 
-		// first check if there is a Fragment manager, a fragment transaction
-		// and a call to the add method which adds the fragment to the transaction
-		boolean isFragmentManager = false;
-		boolean isFragmentTransaction = false;
-		boolean isAddTransaction = false;
+		if (!method.isConcrete() || !method.hasActiveBody()) return;
+
 		for (Unit u : method.getActiveBody().getUnits()) {
 			Stmt stmt = (Stmt) u;
 			if (stmt.containsInvokeExpr()) {
+				final String className = stmt.getInvokeExpr().getMethod().getDeclaringClass().getName();
 				final String methodName = stmt.getInvokeExpr().getMethod().getName();
-				if (methodName.equals("getFragmentManager") || methodName.equals("getSupportFragmentManager") || methodName.equals("getChildFragmentManager"))
-					isFragmentManager = true;
-				else if (methodName.equals("beginTransaction"))
-					isFragmentTransaction = true;
-				else if (methodName.equals("add") || methodName.equals("replace"))
-					isAddTransaction = true;
-				else if (methodName.equals("inflate") && stmt.getInvokeExpr().getArgCount() > 1) {
-					Value arg = stmt.getInvokeExpr().getArg(0);
-					Integer fragmentID = valueProvider.getValue(method, stmt, arg, Integer.class);
-					if (fragmentID != null)
-						fragmentIDs.put(lifecycleElement, fragmentID);
-				}
-			}
-		}
+				if(! className.equals("android.support.v4.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.FragmentTransaction")) continue;
+				if(! methodName.equals("add") && ! methodName.equals("replace")) continue;
+				for (int i = 0; i < stmt.getInvokeExpr().getArgCount(); i++) {
+					Value br = stmt.getInvokeExpr().getArg(i);
 
-		// now get the fragment class from the second argument of the add method
-		// from the transaction
-		if (isFragmentManager && isFragmentTransaction && isAddTransaction)
-			for (Unit u : method.getActiveBody().getUnits()) {
-				Stmt stmt = (Stmt) u;
-				if (stmt.containsInvokeExpr()) {
-					InvokeExpr invExpr = stmt.getInvokeExpr();
-					if (invExpr instanceof InstanceInvokeExpr) {
-						InstanceInvokeExpr iinvExpr = (InstanceInvokeExpr) invExpr;
+					if (br.getType() instanceof RefType) {
+						RefType rt = (RefType) br.getType();
+						if (br instanceof ClassConstant) rt = (RefType) ((ClassConstant) br).toSootType();
 
-						// Make sure that we referring to the correct class and
-						// method
-						isFragmentTransaction = scFragmentTransaction != null && Scene.v().getFastHierarchy()
-								.canStoreType(iinvExpr.getBase().getType(), scFragmentTransaction.getType());
-						isFragmentTransaction |= scSupportFragmentTransaction != null && Scene.v().getFastHierarchy()
-								.canStoreType(iinvExpr.getBase().getType(), scSupportFragmentTransaction.getType());
-						isFragmentTransaction |= scAndroidXFragmentTransaction != null && Scene.v().getFastHierarchy()
-								.canStoreType(iinvExpr.getBase().getType(), scAndroidXFragmentTransaction.getType());
-						isAddTransaction = stmt.getInvokeExpr().getMethod().getName().equals("add")
-								|| stmt.getInvokeExpr().getMethod().getName().equals("replace");
-
-						if (isFragmentTransaction && isAddTransaction) {
-							// We take all fragments passed to the method
-							for (int i = 0; i < stmt.getInvokeExpr().getArgCount(); i++) {
-								Value br = stmt.getInvokeExpr().getArg(i);
-
-								// Is this a fragment?
-								if (br.getType() instanceof RefType) {
-									RefType rt = (RefType) br.getType();
-									if (br instanceof ClassConstant)
-										rt = (RefType) ((ClassConstant) br).toSootType();
-
-									boolean addFragment = scFragment != null
-											&& Scene.v().getFastHierarchy().canStoreType(rt, scFragment.getType());
-									addFragment |= scSupportFragment != null && Scene.v().getFastHierarchy()
-											.canStoreType(rt, scSupportFragment.getType());
-									addFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy()
-											.canStoreType(rt, scAndroidXFragment.getType());
-									if (addFragment) {
-										// https://mailman.cs.mcgill.ca/pipermail/soot-list/2022-May/009310.html
-										// checkAndAddFragment(method.getDeclaringClass(), rt.getSootClass());
-										Set<SootClass> activities = findDeclaringActivities(method, this.entryPointClasses);
-										for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
+						boolean addFragment = scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(rt, scSupportFragment.getType());
+						addFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(rt, scAndroidXFragment.getType());
+						if (addFragment) {
+							// https://mailman.cs.mcgill.ca/pipermail/soot-list/2022-May/009310.html
+							// checkAndAddFragment(method.getDeclaringClass(), rt.getSootClass());
+							Set<SootClass> activities = findDeclaringActivities(method);
+							if(br instanceof ClassConstant)
+								for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
+							else if(br instanceof Local) {
+								Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) br).possibleTypes();
+								if(possibleTypes.isEmpty()) possibleTypes.add(rt);
+								for(Type possibleType: possibleTypes) {
+									if(possibleType instanceof RefType) {
+										for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+									} else if (possibleType instanceof AnySubType) {
+										for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
 									}
 								}
 							}
@@ -565,9 +552,43 @@ public abstract class AbstractCallbackAnalyzer {
 					}
 				}
 			}
+		}
 	}
 
-	protected Set<SootClass> findDeclaringActivities(SootMethod method, Set<SootClass> entryPointClasses) {
+	protected void analyzeMethodForFragmentShow(SootClass lifecycleElement, SootMethod method) {
+		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName())) return;
+
+		if (!method.isConcrete() || !method.hasActiveBody()) return;
+
+		for (Unit u : method.getActiveBody().getUnits()) {
+			Stmt stmt = (Stmt) u;
+			if (stmt.containsInvokeExpr()) {
+				final String className = stmt.getInvokeExpr().getMethod().getDeclaringClass().getName();
+				final String methodName = stmt.getInvokeExpr().getMethod().getName();
+				if(! className.equals("androidx.fragment.app.DialogFragment") && ! className.equals("android.support.v4.app.DialogFragment")) continue;
+				if(! methodName.equals("show") && ! methodName.equals("showNow")) continue;
+				InvokeExpr invExpr = stmt.getInvokeExpr();
+				if (invExpr instanceof InstanceInvokeExpr) {
+					InstanceInvokeExpr iinvExpr = (InstanceInvokeExpr) invExpr;
+					Set<SootClass> activities = findDeclaringActivities(method);
+					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) iinvExpr.getBase()).possibleTypes();
+					if(possibleTypes.isEmpty()) possibleTypes.add(iinvExpr.getBase().getType());
+					for(Type possibleType: possibleTypes) {
+						if(possibleType instanceof RefType) {
+							for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+						} else if (possibleType instanceof AnySubType) {
+							for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/*
+	 * Backward traverse in the call graph from method to find out the first connecting activity
+	 */
+	protected Set<SootClass> findDeclaringActivities(SootMethod method) {
 		Set<SootClass> activities = new HashSet<>();
 		Stack<SootMethod> stack = new Stack<>();
 		Set<String> visited = new HashSet<>();
@@ -580,7 +601,7 @@ public abstract class AbstractCallbackAnalyzer {
 			SootClass topMtdRtn = null;
 			Type rtnType = topMtd.getReturnType();
 			if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
-			if(topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null && entryPointClasses.contains(topMtdRtn)) activities.add(topMtdRtn);
+			if(topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null && this.activityNames.contains(topMtdRtn.getName())) activities.add(topMtdRtn);
 			else {
 				Iterator<Edge> edges = Scene.v().getCallGraph().edgesInto(topMtd);
 				while(edges.hasNext()) {
@@ -592,6 +613,34 @@ public abstract class AbstractCallbackAnalyzer {
 		return activities;
 	}
 
+	/*
+	 * Backward traverse in the call graph from method to find out the first connecting component
+	 */
+	protected Set<SootClass> findDeclaringComponents(SootMethod method) {
+		Set<SootClass> components = new HashSet<>();
+		Stack<SootMethod> stack = new Stack<>();
+		Set<String> visited = new HashSet<>();
+		stack.push(method);
+		while(! stack.isEmpty()) {
+			SootMethod topMtd = stack.pop();
+			if(! visited.add(topMtd.getSignature())) continue;
+			String topClsName = topMtd.getDeclaringClass().getName();
+			String topMtdName = topMtd.getName();
+			SootClass topMtdRtn = null;
+			Type rtnType = topMtd.getReturnType();
+			if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
+			if(topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) components.add(topMtdRtn);
+			else {
+				Iterator<Edge> edges = Scene.v().getCallGraph().edgesInto(topMtd);
+				while(edges.hasNext()) {
+					Edge edge = edges.next();
+					stack.push(edge.src());
+				}
+			}
+		}
+		return components;
+	}
+
 	/**
 	 * Check whether a method registers a FragmentStatePagerAdapter to a ViewPager.
 	 * This pattern is very common for tabbed apps.
@@ -601,142 +650,49 @@ public abstract class AbstractCallbackAnalyzer {
 	 *
 	 * @author Julius Naeumann
 	 */
-	protected void analyzeMethodForViewPagers(SootClass clazz, SootMethod method) {
-		// We need at least one fragment base class
-		if (scSupportViewPager == null && scAndroidXViewPager == null)
-			return;
-		// We need at least one class with a method to register a fragment
-		if (scFragmentStatePagerAdapter == null && scAndroidXFragmentStatePagerAdapter == null
-				&& scFragmentPagerAdapter == null && scAndroidXFragmentPagerAdapter == null)
-			return;
+	protected void analyzeMethodForViewPagers(SootClass lifecycleElement, SootMethod method) {
+		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName())) return;
 
-		if (!method.isConcrete())
-			return;
+		if (!method.isConcrete()) return;
+
+		boolean extendsAdapter = scFragmentStatePagerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scFragmentStatePagerAdapter.getType());
+		extendsAdapter |= scAndroidXFragmentStatePagerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scAndroidXFragmentStatePagerAdapter.getType());
+		extendsAdapter |= scFragmentPagerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scFragmentPagerAdapter.getType());
+		extendsAdapter |= scAndroidXFragmentPagerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scAndroidXFragmentPagerAdapter.getType());
+		extendsAdapter |= scAndroidXFragmentStateAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scAndroidXFragmentStateAdapter.getType());
+
+
+		if(! extendsAdapter) return;
+
+		boolean isGetItem = method.getSubSignature().equals("android.support.v4.app.Fragment getItem(int)");
+		isGetItem |= method.getSubSignature().equals("androidx.fragment.app.Fragment getItem(int)");
+
+		boolean isCreateFragment = method.getSubSignature().equals("androidx.fragment.app.Fragment createFragment(int)");
+
+		if(! isGetItem && ! isCreateFragment) return;
 
 		Body body = method.retrieveActiveBody();
 
-		if (method.getDeclaringClass().getName().equals("org.liberty.android.fantastischmemo.ui.AnyMemo")
-				&& method.getName().equals("initDrawer"))
-			System.out.println("x");
+		if(body == null) return;
 
-		// look for invocations of ViewPager.setAdapter
+		Set<SootClass> activities = findDeclaringActivities(method);
 		for (Unit u : body.getUnits()) {
-			Stmt stmt = (Stmt) u;
-			if (!stmt.containsInvokeExpr())
-				continue;
-
-			InvokeExpr invExpr = stmt.getInvokeExpr();
-			if (!(invExpr instanceof InstanceInvokeExpr))
-				continue;
-			InstanceInvokeExpr iinvExpr = (InstanceInvokeExpr) invExpr;
-
-			// check whether class is of ViewPager type
-			if (!safeIsType(iinvExpr.getBase(), scSupportViewPager)
-					&& !safeIsType(iinvExpr.getBase(), scAndroidXViewPager))
-				continue;
-
-			// check whether setAdapter method is called
-			if (!stmt.getInvokeExpr().getMethod().getName().equals("setAdapter")
-					|| stmt.getInvokeExpr().getArgCount() != 1)
-				continue;
-
-			// get argument
-			Value pa = stmt.getInvokeExpr().getArg(0);
-			if (!(pa.getType() instanceof RefType))
-				continue;
-			RefType rt = (RefType) pa.getType();
-
-			// check whether argument is of type FragmentStatePagerAdapter
-			if (!safeIsType(pa, scFragmentStatePagerAdapter) && !safeIsType(pa, scAndroidXFragmentStatePagerAdapter)
-					&& !safeIsType(pa, scFragmentPagerAdapter) && !safeIsType(pa, scAndroidXFragmentPagerAdapter))
-				continue;
-
-			// now analyze getItem() to find possible Fragments
-			SootMethod getItem = rt.getSootClass().getMethodUnsafe("android.support.v4.app.Fragment getItem(int)");
-			if (getItem == null)
-				getItem = rt.getSootClass().getMethodUnsafe("androidx.fragment.app.Fragment getItem(int)");
-			if (getItem == null || !getItem.isConcrete())
-				continue;
-
-			Body b = getItem.retrieveActiveBody();
-			if (b == null)
-				continue;
-
-			// iterate and add any returned Fragment classes
-			for (Unit getItemUnit : b.getUnits()) {
-				if (getItemUnit instanceof ReturnStmt) {
-					ReturnStmt rs = (ReturnStmt) getItemUnit;
-					Value rv = rs.getOp();
-					Type type = rv.getType();
-					if (type instanceof RefType) {
-						SootClass rtClass = ((RefType) type).getSootClass();
-						if (rv instanceof Local && (rtClass.getName().startsWith("android.")
-								|| rtClass.getName().startsWith("androidx.")))
-							analyzeFragmentCandidates(rs, getItem, (Local) rv);
-						else
-							checkAndAddFragment(method.getDeclaringClass(), rtClass);
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * Attempts to find fragments that are not returned immediately, but that
-	 * require a more complex backward analysis. This analysis is best-effort, we do
-	 * not attempt to solve every possible case.
-	 * 
-	 * @param s The statement at which the fragment is returned
-	 * @param m The method in which the fragment is returned
-	 * @param l The local that contains the fragment
-	 */
-	private void analyzeFragmentCandidates(Stmt s, SootMethod m, Local l) {
-		ExceptionalUnitGraph g = ExceptionalUnitGraphFactory.createExceptionalUnitGraph(m.getActiveBody());
-		SimpleLocalDefs lds = new SimpleLocalDefs(g);
-
-		List<Pair<Local, Stmt>> toSearch = new ArrayList<>();
-		Set<Pair<Local, Stmt>> doneSet = new HashSet<>();
-		toSearch.add(new Pair<>(l, s));
-
-		while (!toSearch.isEmpty()) {
-			Pair<Local, Stmt> pair = toSearch.remove(0);
-			if (doneSet.add(pair)) {
-				List<Unit> defs = lds.getDefsOfAt(pair.getO1(), pair.getO2());
-				for (Unit def : defs) {
-					if (def instanceof AssignStmt) {
-						AssignStmt assignStmt = (AssignStmt) def;
-						Value rop = assignStmt.getRightOp();
-						if (rop instanceof ArrayRef) {
-							ArrayRef arrayRef = (ArrayRef) rop;
-
-							// Look for all assignments to the array
-							toSearch.add(new Pair<>((Local) arrayRef.getBase(), assignStmt));
-						} else if (rop instanceof FieldRef) {
-							FieldRef fieldRef = (FieldRef) rop;
-							try {
-								List<Type> typeList = arrayToContentTypes.get(fieldRef.getField());
-								typeList.stream().map(t -> ((RefType) t).getSootClass())
-										.forEach(c -> checkAndAddFragment(m.getDeclaringClass(), c));
-							} catch (ExecutionException e) {
-								logger.error(String.format("Could not load potential types for field %s",
-										fieldRef.getField().getSignature()), e);
-							}
+			if (u instanceof ReturnStmt) {
+				ReturnStmt rs = (ReturnStmt) u;
+				Value rv = rs.getOp();
+				if (rv instanceof Local && rv.getType() instanceof RefType) {
+					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) rv).possibleTypes();
+					if(possibleTypes.isEmpty()) possibleTypes.add(rv.getType());
+					for(Type possibleType: possibleTypes) {
+						if(possibleType instanceof RefType) {
+							for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+						} else if (possibleType instanceof AnySubType) {
+							for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
 						}
 					}
 				}
 			}
 		}
-	}
-
-	/**
-	 * Checks whether the given value is of the type of the given class
-	 * 
-	 * @param val   The value to check
-	 * @param clazz The class from which to get the type
-	 * @return True if the given value is of the type of the given class
-	 */
-	private boolean safeIsType(Value val, SootClass clazz) {
-		return clazz != null && Scene.v().getFastHierarchy().canStoreType(val.getType(), clazz.getType());
 	}
 
 	/**
@@ -791,9 +747,9 @@ public abstract class AbstractCallbackAnalyzer {
 		while (curClass != null) {
 			final String curClassName = curClass.getName();
 			if (curClassName.equals("android.app.Activity")
-					|| curClassName.equals("android.support.v7.app.ActionBarActivity")
-					|| curClassName.equals("android.support.v7.app.AppCompatActivity")
-					|| curClassName.equals("androidx.appcompat.app.AppCompatActivity"))
+				|| curClassName.equals("android.support.v7.app.AppCompatActivity")
+				|| curClassName.equals("androidx.appcompat.app.AppCompatActivity")
+				|| curClassName.equals("androidx.activity.ComponentActivity"))
 				return true;
 			// As long as the class is subclass of android.app.Activity,
 			// it can be sure that the setContentView method is what we expected.
@@ -824,7 +780,7 @@ public abstract class AbstractCallbackAnalyzer {
 		SootClass curClass = inv.getMethod().getDeclaringClass();
 		while (curClass != null) {
 			final String curClassName = curClass.getName();
-			if (curClassName.equals("android.app.Fragment") || curClassName.equals("android.view.LayoutInflater"))
+			if (curClassName.equals("android.view.LayoutInflater"))
 				return true;
 			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
 		}

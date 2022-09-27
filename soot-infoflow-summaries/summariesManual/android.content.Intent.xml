@@ -1243,7 +1243,7 @@
 			<flows>
 				<flow isAlias="false" typeChecking="false">
 					<from sourceSinkType="Parameter" ParameterIndex="0" />
-					<to sourceSinkType="Field"
+					<to sourceSinkType="Field" BaseType="android.content.Intent"
 						AccessPath="[android.content.Intent: java.lang.String mimeType]"
 						AccessPathTypes="[java.lang.String]" />
 				</flow>

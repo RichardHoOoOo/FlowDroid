@@ -402,3 +402,13 @@ javax.sql.ConnectionEventListener
 javax.sql.RowSetListener
 javax.sql.StatementEventListener
 javax.xml.transform.ErrorListener
+android.webkit.WebViewClient
+android.webkit.WebChromeClient
+androidx.viewpager.widget.PagerAdapter
+androidx.fragment.app.FragmentStatePagerAdapter
+androidx.fragment.app.FragmentPagerAdapter
+android.support.v4.view.PagerAdapter
+android.support.v4.app.FragmentStatePagerAdapter
+android.support.v4.app.FragmentPagerAdapter
+androidx.recyclerview.widget.RecyclerView$Adapter
+androidx.viewpager2.adapter.FragmentStateAdapter

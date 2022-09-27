@@ -209,6 +209,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 				analyzeMethodForDynamicBroadcastReceiver(method);
 				analyzeMethodForServiceConnection(method);
 				analyzeMethodForFragmentTransaction(lifecycleElement, method);
+				analyzeMethodForFragmentShow(lifecycleElement, method);
 				analyzeMethodForViewPagers(lifecycleElement, method);
 			}
 		}
@@ -255,7 +256,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 				continue;
 			if (SystemClassHandler.v().isClassInSystemPackage(sm.getDeclaringClass().getName()))
 				continue;
-			RefType fragmentType = RefType.v("android.app.Fragment");
+
 			for (Unit u : sm.retrieveActiveBody().getUnits()) {
 				if (u instanceof Stmt) {
 					Stmt stmt = (Stmt) u;
@@ -273,7 +274,9 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 							for (Value val : inv.getArgs()) {
 								Integer intValue = valueProvider.getValue(sm, stmt, val, Integer.class);
 								if (intValue != null) {
-									this.layoutClasses.put(sm.getDeclaringClass(), intValue);
+									Set<SootClass> activities = findDeclaringActivities(sm);
+									for(SootClass activity: activities)
+										this.layoutClasses.put(activity, intValue);
 								}
 
 							}
@@ -281,7 +284,9 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 						if (invokesInflate(inv)) {
 							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(0), Integer.class);
 							if (intValue != null) {
-								this.layoutClasses.put(sm.getDeclaringClass(), intValue);
+								Set<SootClass> components = findDeclaringComponents(sm);
+								for(SootClass component: components)
+									this.layoutClasses.put(component, intValue);
 							}
 						}
 					}
