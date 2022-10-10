@@ -50,6 +50,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	private ISolverTerminationReason isKilled = null;
 	private MultiMap<SootClass, AndroidCallbackDefinition> viewCallbacks;
 
+
 	public DefaultCallbackAnalyzer(InfoflowAndroidConfiguration config, Set<SootClass> entryPointClasses)
 			throws IOException {
 		super(config, entryPointClasses);
@@ -118,15 +119,25 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 					// Find the mappings between classes and layouts
 					findClassLayoutMappings();
 
+
 					// Add the methods that have become reachable in the views
 					MultiMap<SootMethod, SootClass> reverseViewCallbacks = new HashMultiMap<>();
 					for (Pair<SootClass, AndroidCallbackDefinition> i : viewCallbacks)
 						reverseViewCallbacks.put(i.getO2().getTargetMethod(), i.getO1());
+					reachableChangedListener = Scene.v().getReachableMethods().listener();
 					while (reachableChangedListener.hasNext()) {
 						SootMethod m = reachableChangedListener.next().method();
 						Set<SootClass> o = reverseViewCallbacks.get(m);
 						for (SootClass i : o) {
 							callbackWorklist.put(i, m);
+						}
+					}
+
+					// Put fragments callbacks into the worklist since they are never included in the viewCallbacks if fragments does not contain xml callbacks or view callbacks
+					for(SootClass fragCls: fragments) {
+						List<MethodOrMethodContext> lcs = new ArrayList<MethodOrMethodContext>(entryPointUtils.getLifecycleMethods(fragCls));
+						for(MethodOrMethodContext lc: lcs) {
+							callbackWorklist.put(fragCls, lc.method());
 						}
 					}
 
@@ -207,7 +218,6 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 			if (method.isConcrete()) {
 				analyzeMethodForCallbackRegistrations(lifecycleElement, method);
 				analyzeMethodForDynamicBroadcastReceiver(method);
-				analyzeMethodForServiceConnection(method);
 				analyzeMethodForFragmentTransaction(lifecycleElement, method);
 				analyzeMethodForFragmentShow(lifecycleElement, method);
 				analyzeMethodForViewPagers(lifecycleElement, method);
@@ -247,16 +257,14 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	 * Finds the mappings between classes and their respective layout files
 	 */
 	private void findClassLayoutMappings() {
-		if (rmIterator == null)
+		//if (rmIterator == null)
 			rmIterator = Scene.v().getReachableMethods().listener();
 		while (rmIterator.hasNext()) {
 			SootMethod sm = rmIterator.next().method();
-
 			if (!sm.isConcrete())
 				continue;
 			if (SystemClassHandler.v().isClassInSystemPackage(sm.getDeclaringClass().getName()))
 				continue;
-
 			for (Unit u : sm.retrieveActiveBody().getUnits()) {
 				if (u instanceof Stmt) {
 					Stmt stmt = (Stmt) u;
@@ -285,7 +293,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(0), Integer.class);
 							if (intValue != null) {
 								Set<SootClass> components = findDeclaringComponents(sm);
-								for(SootClass component: components)
+								for(SootClass component: components) 
 									this.layoutClasses.put(component, intValue);
 							}
 						}

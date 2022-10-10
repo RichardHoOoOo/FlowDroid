@@ -142,14 +142,20 @@ public class IccRedirectionCreator {
 								return null;
 						}
 					}
-				} else if (stmt.getInvokeExpr().getMethod().getName().equals("bindService")) {
-					Value v = stmt.getInvokeExpr().getArg(1);
-					if (v.getType() instanceof RefType) {
-						RefType rt = (RefType) v.getType();
-						redirectMethod = generateRedirectMethodForBindService(rt.getSootClass(),
-								instrumentedDestinationSC);
-						if (redirectMethod == null)
-							return null;
+				} else if (stmt.getInvokeExpr().getMethod().getName().equals("bindService") || stmt.getInvokeExpr().getMethod().getName().equals("bindIsolatedService")) {
+					for(int i=0; i<stmt.getInvokeExpr().getMethod().getParameterCount(); i++) {
+						Type type = stmt.getInvokeExpr().getMethod().getParameterType(i);
+						if(type instanceof RefType && ((RefType) type).getSootClass().getName().equals("android.content.ServiceConnection")) {
+							Value v = stmt.getInvokeExpr().getArg(i);
+							if (v.getType() instanceof RefType) {
+								RefType rt = (RefType) v.getType();
+								redirectMethod = generateRedirectMethodForBindService(rt.getSootClass(),
+										instrumentedDestinationSC);
+								if (redirectMethod == null)
+									return null;
+							}
+							break;
+						}
 					}
 				} else {
 					redirectMethod = generateRedirectMethod(instrumentedDestinationSC);
@@ -428,9 +434,17 @@ public class IccRedirectionCreator {
 			InstanceInvokeExpr iiexpr = (InstanceInvokeExpr) fromStmt.getInvokeExpr();
 			args.add(iiexpr.getBase());
 			args.add(iiexpr.getArg(0));
-		} else if (fromStmt.toString().contains("bindService")) {
+		} else if (callee.getName().equals("bindService") || callee.getName().equals("bindIsolatedService")) {
 			Value arg0 = fromStmt.getInvokeExpr().getArg(0); // intent
-			Value arg1 = fromStmt.getInvokeExpr().getArg(1); // serviceConnection
+			int serviceConnArgIdx = -1;
+			for(int i=0; i<callee.getParameterCount(); i++) {
+				Type type = callee.getParameterType(i);
+				if(type instanceof RefType && ((RefType) type).getSootClass().getName().equals("android.content.ServiceConnection")) {
+					serviceConnArgIdx = i;
+					break;
+				}
+			}
+			Value arg1 = fromStmt.getInvokeExpr().getArg(serviceConnArgIdx); // serviceConnection
 			args.add(arg1);
 			args.add(arg0);
 		} else {

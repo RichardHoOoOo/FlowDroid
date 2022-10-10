@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.HashSet;
 
 import pxb.android.axml.AxmlVisitor;
 import soot.FastHierarchy;
@@ -132,7 +133,8 @@ public class LayoutFileParser extends AbstractResourceParser {
 	 * @param layoutFile The XML file in which the callback has been found
 	 * @param callback   The callback found in the given XML file
 	 */
-	private void addCallbackMethod(String layoutFile, String callback) {
+	private void addCallbackMethod(String layoutFile, String callback, Set<String> visited) {
+		if(! visited.add(layoutFile)) return;
 		layoutFile = layoutFile.replace("/layout-large/", "/layout/");
 		callbackMethods.put(layoutFile, callback);
 
@@ -140,7 +142,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 		// we have processed the target
 		if (includeDependencies.containsKey(layoutFile))
 			for (String target : includeDependencies.get(layoutFile))
-				addCallbackMethod(target, callback);
+				addCallbackMethod(target, callback, visited);
 	}
 
 	/**
@@ -149,11 +151,12 @@ public class LayoutFileParser extends AbstractResourceParser {
 	 * @param layoutFile The XML file in which the fragment has been found
 	 * @param fragment   The fragment found in the given XML file
 	 */
-	private void addFragment(String layoutFile, SootClass fragment) {
+	private void addFragment(String layoutFile, SootClass fragment, Set<String> visited) {
 		// Do not add null fragments
 		if (fragment == null)
 			return;
 
+		if(! visited.add(layoutFile)) return;
 		layoutFile = layoutFile.replace("/layout-large/", "/layout/");
 		fragments.put(layoutFile, fragment);
 
@@ -161,7 +164,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 		// we have processed the target
 		if (includeDependencies.containsKey(layoutFile))
 			for (String target : includeDependencies.get(layoutFile))
-				addFragment(target, fragment);
+				addFragment(target, fragment, visited);
 	}
 
 	/**
@@ -267,7 +270,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 			else if (rootNode.getAttribute("navGraph") != null)
 				parseIncludeAttributes(layoutFile, rootNode);
 			else {
-				addFragment(layoutFile, getLayoutClass(attr.getValue().toString()));
+				addFragment(layoutFile, getLayoutClass(attr.getValue().toString()), new HashSet<>());
 				if (attr.getType() != AxmlVisitor.TYPE_STRING)
 					logger.warn("Invalid target resource " + attr.getValue() + "for fragment class value");
 				getLayoutClass(attr.getValue().toString());
@@ -318,11 +321,17 @@ public class LayoutFileParser extends AbstractResourceParser {
 					// simply copy the callbacks we have found there
 					if (callbackMethods.containsKey(targetFile))
 						for (String callback : callbackMethods.get(targetFile))
-							addCallbackMethod(layoutFile, callback);
-					else {
+							addCallbackMethod(layoutFile, callback, new HashSet<>());
+					if (fragments.containsKey(targetFile))
+						for (SootClass frag : fragments.get(targetFile))
+							addFragment(layoutFile, frag, new HashSet<>());
+					if (userControls.containsKey(targetFile))
+						for (AndroidLayoutControl alc : userControls.get(targetFile))
+							addUserControl(layoutFile, alc, new HashSet<>());
+					// else {
 						// We need to record a dependency to resolve later
 						includeDependencies.put(targetFile, layoutFile);
-					}
+					// }
 				}
 			}
 		}
@@ -341,11 +350,23 @@ public class LayoutFileParser extends AbstractResourceParser {
 
 		// Check for a button click listener
 		if (lc.getClickListener() != null)
-			addCallbackMethod(layoutFile, lc.getClickListener());
+			addCallbackMethod(layoutFile, lc.getClickListener(), new HashSet<>());
 
 		// Register the user control
 		if (!loadOnlySensitiveControls || lc.isSensitive())
-			this.userControls.put(layoutFile, lc);
+			addUserControl(layoutFile, lc, new HashSet<>());
+	}
+
+	private void addUserControl(String layoutFile, AndroidLayoutControl lc, Set<String> visited) {
+		if(! visited.add(layoutFile)) return;
+		layoutFile = layoutFile.replace("/layout-large/", "/layout/");
+		this.userControls.put(layoutFile, lc);
+
+		// Recursively process any dependencies we might have collected before
+		// we have processed the target
+		if (includeDependencies.containsKey(layoutFile))
+			for (String target : includeDependencies.get(layoutFile))
+				addUserControl(target, lc, visited);
 	}
 
 	/**

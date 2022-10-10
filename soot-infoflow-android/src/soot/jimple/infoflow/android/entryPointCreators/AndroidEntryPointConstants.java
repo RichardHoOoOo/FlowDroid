@@ -78,7 +78,7 @@ public class AndroidEntryPointConstants {
 	public static final String HOSTAPDUSERVICE_ONDEACTIVATED = "void onDeactivated(int)";
 
 	public static final String FRAGMENT_ONCREATE = "void onCreate(android.os.Bundle)";
-	public static final String FRAGMENT_ONATTACH = "void onAttach(android.app.Activity)";
+	public static final String FRAGMENT_ONATTACH = "void onAttach(android.content.Context)";
 	public static final String FRAGMENT_ONCREATEVIEW = "android.view.View onCreateView(android.view.LayoutInflater,android.view.ViewGroup,android.os.Bundle)";
 	public static final String FRAGMENT_ONVIEWCREATED = "void onViewCreated(android.view.View,android.os.Bundle)";
 	public static final String FRAGMENT_ONSTART = "void onStart()";

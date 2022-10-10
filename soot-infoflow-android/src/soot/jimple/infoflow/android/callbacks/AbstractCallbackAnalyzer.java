@@ -87,8 +87,6 @@ import java.util.Stack;
  */
 public abstract class AbstractCallbackAnalyzer {
 
-	private static final String SIG_CAR_CREATE = "<android.car.Car: android.car.Car createCar(android.content.Context,android.content.ServiceConnection)>";
-
 	protected final Logger logger = LoggerFactory.getLogger(getClass());
 
 	protected final SootClass scContext = Scene.v().getSootClassUnsafe("android.content.Context");
@@ -130,6 +128,11 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final Set<SootClass> dynamicManifestComponents = new HashSet<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClasses = new HashMultiMap<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClassesRev = new HashMultiMap<>();
+	protected final Set<SootClass> fragments = new HashSet<>();
+
+	public void addFragment(SootClass fragmentClass) {
+		this.fragments.add(fragmentClass);
+	}
 
 	protected final List<ICallbackFilter> callbackFilters = new ArrayList<>();
 	protected final Set<SootClass> excludedEntryPoints = new HashSet<>();
@@ -230,6 +233,10 @@ public abstract class AbstractCallbackAnalyzer {
 		this.config = config;
 		this.entryPointClasses = entryPointClasses;
 		this.androidCallbacks = androidCallbacks;
+	}
+
+	public void addAdditionalCallbacks(Set<String> additionalCallbacks) {
+		for(String additionalCallback: additionalCallbacks) this.androidCallbacks.add(additionalCallback);
 	}
 
 	/**
@@ -450,53 +457,23 @@ public abstract class AbstractCallbackAnalyzer {
 						&& fastHierarchy.canStoreType(methodRef.getDeclaringClass().getType(), contextType)) {
 					Value br = iexpr.getArg(0);
 					if (br.getType() instanceof RefType) {
-						RefType rt = (RefType) br.getType();
-						if (!SystemClassHandler.v().isClassInSystemPackage(rt.getSootClass().getName()))
-							dynamicManifestComponents.add(rt.getSootClass());
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * Checks whether the given method dynamically registers a new service
-	 * connection
-	 *
-	 * @param method The method to check
-	 */
-	protected void analyzeMethodForServiceConnection(SootMethod method) {
-		// Do not analyze system classes
-		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName()))
-			return;
-		if (!method.isConcrete() || !method.hasActiveBody())
-			return;
-
-		for (Unit u : method.getActiveBody().getUnits()) {
-			Stmt stmt = (Stmt) u;
-			if (stmt.containsInvokeExpr()) {
-				final InvokeExpr iexpr = stmt.getInvokeExpr();
-				final SootMethodRef methodRef = iexpr.getMethodRef();
-				if (methodRef.getSignature().equals(SIG_CAR_CREATE)) {
-					Value br = iexpr.getArg(1);
-
-					// We need all possible types for the parameter
-					if (br instanceof Local && Scene.v().hasPointsToAnalysis()) {
-						PointsToSet pts = Scene.v().getPointsToAnalysis().reachingObjects((Local) br);
-						for (Type tp : pts.possibleTypes()) {
-							if (tp instanceof RefType) {
-								RefType rt = (RefType) tp;
-								if (!SystemClassHandler.v().isClassInSystemPackage(rt.getSootClass().getName()))
-									dynamicManifestComponents.add(rt.getSootClass());
+						if(br instanceof Local) {
+							Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) br).possibleTypes();
+							if(possibleTypes.isEmpty()) {
+								if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) br.getType()).getSootClass().getName()))
+										dynamicManifestComponents.add(((RefType) br.getType()).getSootClass());
+							} else {
+								for(Type possibleType: possibleTypes) {
+									if(possibleType instanceof RefType) {
+										if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) possibleType).getSootClass().getName()))
+											dynamicManifestComponents.add(((RefType) possibleType).getSootClass());
+									} else if (possibleType instanceof AnySubType) {
+										if (!SystemClassHandler.v().isClassInSystemPackage(((AnySubType) possibleType).getBase().getSootClass().getName()))
+											dynamicManifestComponents.add(((AnySubType) possibleType).getBase().getSootClass());
+									}
+								}
 							}
 						}
-					}
-
-					// Just to be sure, also add the declared type
-					if (br.getType() instanceof RefType) {
-						RefType rt = (RefType) br.getType();
-						if (!SystemClassHandler.v().isClassInSystemPackage(rt.getSootClass().getName()))
-							dynamicManifestComponents.add(rt.getSootClass());
 					}
 				}
 			}
@@ -539,12 +516,15 @@ public abstract class AbstractCallbackAnalyzer {
 								for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
 							else if(br instanceof Local) {
 								Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) br).possibleTypes();
-								if(possibleTypes.isEmpty()) possibleTypes.add(rt);
-								for(Type possibleType: possibleTypes) {
-									if(possibleType instanceof RefType) {
-										for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
-									} else if (possibleType instanceof AnySubType) {
-										for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+								if(possibleTypes.isEmpty()) {
+									for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
+								} else {
+									for(Type possibleType: possibleTypes) {
+										if(possibleType instanceof RefType) {
+											for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+										} else if (possibleType instanceof AnySubType) {
+											for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+										}
 									}
 								}
 							}
@@ -572,12 +552,15 @@ public abstract class AbstractCallbackAnalyzer {
 					InstanceInvokeExpr iinvExpr = (InstanceInvokeExpr) invExpr;
 					Set<SootClass> activities = findDeclaringActivities(method);
 					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) iinvExpr.getBase()).possibleTypes();
-					if(possibleTypes.isEmpty()) possibleTypes.add(iinvExpr.getBase().getType());
-					for(Type possibleType: possibleTypes) {
-						if(possibleType instanceof RefType) {
-							for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
-						} else if (possibleType instanceof AnySubType) {
-							for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+					if(possibleTypes.isEmpty()) {
+						for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) iinvExpr.getBase().getType()).getSootClass());
+					} else {
+						for(Type possibleType: possibleTypes) {
+							if(possibleType instanceof RefType) {
+								for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+							} else if (possibleType instanceof AnySubType) {
+								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+							}
 						}
 					}
 				}
@@ -682,12 +665,15 @@ public abstract class AbstractCallbackAnalyzer {
 				Value rv = rs.getOp();
 				if (rv instanceof Local && rv.getType() instanceof RefType) {
 					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) rv).possibleTypes();
-					if(possibleTypes.isEmpty()) possibleTypes.add(rv.getType());
-					for(Type possibleType: possibleTypes) {
-						if(possibleType instanceof RefType) {
-							for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
-						} else if (possibleType instanceof AnySubType) {
-							for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+					if(possibleTypes.isEmpty()) {
+						for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) rv.getType()).getSootClass());
+					} else {
+						for(Type possibleType: possibleTypes) {
+							if(possibleType instanceof RefType) {
+								for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+							} else if (possibleType instanceof AnySubType) {
+								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+							}
 						}
 					}
 				}
@@ -773,7 +759,6 @@ public abstract class AbstractCallbackAnalyzer {
 				.getMethodNameFromSubSignature(inv.getMethodRef().getSubSignature().getString());
 		if (!methodName.equals("inflate"))
 			return false;
-
 		// In some cases, the bytecode points the invocation to the current
 		// class even though it does not implement setContentView, instead
 		// of using the superclass signature
@@ -954,6 +939,7 @@ public abstract class AbstractCallbackAnalyzer {
 	protected void checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
 		this.fragmentClasses.put(componentClass, fragmentClass);
 		this.fragmentClassesRev.put(fragmentClass, componentClass);
+		this.fragments.add(fragmentClass);
 	}
 
 	private boolean isEmpty(Body activeBody) {

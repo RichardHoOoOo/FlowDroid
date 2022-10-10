@@ -139,6 +139,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		this.activityNames = activityNames;
 	}
 
+	protected Set<String> additionalCallbacks = null;
+
+	public void setAdditionalCallbacks(Set<String> additionalCallbacks) {
+		this.additionalCallbacks = additionalCallbacks;
+	}
+
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -671,6 +677,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		jimpleClass.addCallbackFilter(new ApplicationCallbackFilter(entrypoints));
 		jimpleClass.addCallbackFilter(new UnreachableConstructorFilter());
 		jimpleClass.setActivityNames(this.activityNames);
+		jimpleClass.addAdditionalCallbacks(this.additionalCallbacks);
 		jimpleClass.collectCallbackMethods();
 
 		// Find the user-defined sources in the layout XML files. This
@@ -727,6 +734,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 				// Run the soot-based operations
 				constructCallgraphInternal();
+
 				if (!Scene.v().hasCallGraph())
 					throw new RuntimeException("No callgraph in Scene even after creating one. That's very sad "
 							+ "and should never happen.");
@@ -968,6 +976,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					Set<SootClass> fragments = lfp.getFragments().get(layoutFileName);
 					if (fragments != null) {
 						for (SootClass fragment : fragments) {
+							jimpleClass.addFragment(fragment);
 							if (fragmentClasses.put(callbackClass, fragment)) 
 								hasNewCallback = true;
 						}
@@ -1025,6 +1034,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		if (valueProvider != null)
 			jimpleClass.setValueProvider(valueProvider);
 		jimpleClass.setActivityNames(this.activityNames);
+		jimpleClass.addAdditionalCallbacks(this.additionalCallbacks);
 		jimpleClass.collectCallbackMethods();
 
 		// Collect the results
@@ -1759,6 +1769,19 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 						callbackMethodSigs.put(sc, cd.getTargetMethod());
 			}
 		}
+for(SootClass cls: callbackMethodSigs.keySet()) {
+	for(SootMethod mtd: callbackMethodSigs.get(cls)) {
+		System.out.println("cbs: " + cls.getName() + " ==> " + mtd.getSignature());
+	}
+}
+for(SootClass cls: fragmentClasses.keySet()) {
+	for(SootClass frag: fragmentClasses.get(cls)) {
+		System.out.println("frags: " + cls.getName() + " ==> " + frag.getName());
+	}
+}
+for(SootClass cls: components) {
+	System.out.println("comps: " + cls.getName());
+}
 		entryPointCreator.setCallbackFunctions(callbackMethodSigs);
 		entryPointCreator.setFragments(fragmentClasses);
 		entryPointCreator.setComponents(components);
