@@ -1769,19 +1769,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 						callbackMethodSigs.put(sc, cd.getTargetMethod());
 			}
 		}
-for(SootClass cls: callbackMethodSigs.keySet()) {
-	for(SootMethod mtd: callbackMethodSigs.get(cls)) {
-		System.out.println("cbs: " + cls.getName() + " ==> " + mtd.getSignature());
-	}
-}
-for(SootClass cls: fragmentClasses.keySet()) {
-	for(SootClass frag: fragmentClasses.get(cls)) {
-		System.out.println("frags: " + cls.getName() + " ==> " + frag.getName());
-	}
-}
-for(SootClass cls: components) {
-	System.out.println("comps: " + cls.getName());
-}
+
 		entryPointCreator.setCallbackFunctions(callbackMethodSigs);
 		entryPointCreator.setFragments(fragmentClasses);
 		entryPointCreator.setComponents(components);

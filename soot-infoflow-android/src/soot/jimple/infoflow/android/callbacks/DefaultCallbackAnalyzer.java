@@ -221,6 +221,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 				analyzeMethodForFragmentTransaction(lifecycleElement, method);
 				analyzeMethodForFragmentShow(lifecycleElement, method);
 				analyzeMethodForViewPagers(lifecycleElement, method);
+				analyzeMethodForAddView(lifecycleElement, method);
 			}
 		}
 	}

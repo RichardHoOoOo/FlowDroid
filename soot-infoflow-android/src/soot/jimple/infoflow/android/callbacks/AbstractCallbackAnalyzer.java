@@ -119,6 +119,8 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final SootClass scAndroidXFragmentStateAdapter = Scene.v()
 			.getSootClassUnsafe("androidx.viewpager2.adapter.FragmentStateAdapter");
 
+	protected final SootClass viewGroup = Scene.v().getSootClassUnsafe("android.view.ViewGroup");
+
 	protected final InfoflowAndroidConfiguration config;
 	protected final Set<SootClass> entryPointClasses;
 	protected final Set<String> androidCallbacks;
@@ -399,6 +401,67 @@ public abstract class AbstractCallbackAnalyzer {
 			else return false;
 		}
 		return true;
+	}
+
+	protected void analyzeMethodForAddView(SootClass lifecycleElement, SootMethod method) {
+		// Do not analyze system classes
+		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName()))
+			return;
+		if (!method.isConcrete())
+			return;
+
+		// Iterate over all statement and find addView methods
+		for (Unit u : method.retrieveActiveBody().getUnits()) {
+			Stmt stmt = (Stmt) u;
+			if(! stmt.containsInvokeExpr()) continue;
+			InvokeExpr iExpr = stmt.getInvokeExpr();
+			if(! (iExpr instanceof InstanceInvokeExpr)) continue;
+			if(! Scene.v().getFastHierarchy().canStoreType(((InstanceInvokeExpr) iExpr).getBase().getType(), viewGroup.getType())) continue;
+			boolean isAddView = iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,android.view.ViewGroup$LayoutParams)");
+			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,int)");
+			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,int,android.view.ViewGroup$LayoutParams)");
+			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View)");
+			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,int,int)");
+			if(! isAddView) continue;
+			Value view = iExpr.getArg(0);
+			Set<SootClass> components = findDeclaringComponents(method);
+			if(view instanceof Local) {
+				Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) view).possibleTypes();
+				if(possibleTypes.isEmpty()) {
+					if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) view.getType()).getSootClass().getName()))
+							for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) view.getType()).getSootClass());
+				} else {
+					for(Type possibleType: possibleTypes) {
+						if(possibleType instanceof RefType) {
+							if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) possibleType).getSootClass().getName()))
+								for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+						} else if (possibleType instanceof AnySubType) {
+							if (!SystemClassHandler.v().isClassInSystemPackage(((AnySubType) possibleType).getBase().getSootClass().getName()))
+								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private void checkAndAddViewCallbacks(SootClass callbackClass, SootClass viewClass) {
+		Map<String, SootMethod> systemMethods = new HashMap<>(10000);
+		for (SootClass parentClass : Scene.v().getActiveHierarchy().getSuperclassesOf(viewClass)) {
+			if (parentClass.getName().startsWith("android."))
+				for (SootMethod sm : parentClass.getMethods())
+					if (!sm.isConstructor())
+						systemMethods.put(sm.getSubSignature(), sm);
+		}
+		// Scan for methods that overwrite parent class methods
+		for (SootMethod sm : viewClass.getMethods()) {
+			if (!sm.isConstructor()) {
+				SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
+				if (parentMethod != null) {
+					this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+				}
+			}
+		}
 	}
 
 	/**
