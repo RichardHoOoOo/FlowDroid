@@ -56,11 +56,12 @@ public class BackwardsSinkPropagationRule extends AbstractTaintPropagationRule {
 					// Create the new taint abstraction
 					Abstraction abs = new Abstraction(sinkInfo.getDefinition(), ap, stmt, sinkInfo.getUserData(), false,
 							false);
-					abs.setTurnUnit(stmt);
+					abs = abs.deriveNewAbstractionWithTurnUnit(stmt);
 
 					res.add(abs);
 
 					// Set the corresponding call site
+					// https://github.com/secure-software-engineering/FlowDroid/commit/cacf733ae3af36ae749fdb4489dd3a581b221b48
 					if (stmt.containsInvokeExpr())
 						abs.setCorrespondingCallSite(stmt);
 				}

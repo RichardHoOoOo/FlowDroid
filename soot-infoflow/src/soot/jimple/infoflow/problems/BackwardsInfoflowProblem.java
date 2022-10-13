@@ -48,6 +48,7 @@ import soot.jimple.infoflow.solver.functions.SolverReturnFlowFunction;
 import soot.jimple.infoflow.util.BaseSelector;
 import soot.jimple.infoflow.util.ByReferenceBoolean;
 import soot.jimple.infoflow.util.TypeUtils;
+import soot.RefType;
 
 /**
  * Class which contains the flow functions for the backwards analysis. Not to be
@@ -366,14 +367,13 @@ public class BackwardsInfoflowProblem extends AbstractInfoflowProblem {
 										manager.getGlobalTaintManager().addToGlobalTaintState(newAbs);
 									else {
 										enterConditional(newAbs, assignStmt, destUnit);
-										res.add(newAbs);
 
 										if (isPrimitiveOrStringBase(source)) {
-											newAbs.setTurnUnit(srcUnit);
+											newAbs = newAbs.deriveNewAbstractionWithTurnUnit(srcUnit);
 										} else if (leftVal instanceof FieldRef
 												&& isPrimitiveOrStringType(((FieldRef) leftVal).getField().getType())
 												&& !ap.getCanHaveImmutableAliases()) {
-											newAbs.setTurnUnit(srcUnit);
+											newAbs = newAbs.deriveNewAbstractionWithTurnUnit(srcUnit);
 										} else {
 											if (aliasing.canHaveAliasesRightSide(assignStmt, rightVal, newAbs)) {
 												for (Unit pred : manager.getICFG().getPredsOf(assignStmt))
@@ -381,6 +381,7 @@ public class BackwardsInfoflowProblem extends AbstractInfoflowProblem {
 															interproceduralCFG().getMethodOf(pred), newAbs);
 											}
 										}
+										res.add(newAbs);
 									}
 								}
 							}
@@ -508,7 +509,7 @@ public class BackwardsInfoflowProblem extends AbstractInfoflowProblem {
 											Abstraction abs = source.deriveNewAbstraction(ap, stmt);
 											if (abs != null) {
 												if (isPrimitiveOrStringBase(source))
-													abs.setTurnUnit(stmt);
+													abs = abs.deriveNewAbstractionWithTurnUnit(stmt);
 
 												if (abs.getDominator() == null && manager.getConfig()
 														.getImplicitFlowMode().trackControlFlowDependencies()) {
@@ -587,6 +588,13 @@ public class BackwardsInfoflowProblem extends AbstractInfoflowProblem {
 								// (BytecodeTests.flowSensitivityTest1).
 								if (interproceduralCFG().methodWritesValue(dest, paramLocals[i]))
 									continue;
+
+								if(dest.getDeclaringClass().getName().equals("dummyMainClass") && dest.getName().startsWith("redirector")) {
+									Type paraType = dest.getParameterType(i);
+									if(paraType instanceof RefType && ((RefType) paraType).getSootClass().getName().equals("android.content.Intent")) {
+										continue; // Disable forward alias analysis for the intent object passed to redirector calls
+									}
+								}
 
 								// taint all parameters if reflective call site
 								if (isReflectiveCallSite) {
@@ -793,7 +801,7 @@ public class BackwardsInfoflowProblem extends AbstractInfoflowProblem {
 								}
 							}
 						}
-
+						// https://github.com/secure-software-engineering/FlowDroid/commit/cacf733ae3af36ae749fdb4489dd3a581b221b48
 						setCallSite(source, res, (Stmt) callSite);
 
 						return res;
@@ -944,7 +952,7 @@ public class BackwardsInfoflowProblem extends AbstractInfoflowProblem {
 
 						if (!killSource.value && source != zeroValue)
 							res.add(source);
-
+						// https://github.com/secure-software-engineering/FlowDroid/commit/cacf733ae3af36ae749fdb4489dd3a581b221b48
 						setCallSite(source, res, callStmt);
 
 						if (manager.getConfig().getImplicitFlowMode().trackControlFlowDependencies()
