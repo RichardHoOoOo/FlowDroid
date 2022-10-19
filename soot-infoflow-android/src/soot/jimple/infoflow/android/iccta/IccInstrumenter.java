@@ -24,6 +24,14 @@ import soot.jimple.infoflow.handlers.PreAnalysisHandler;
 import soot.util.Chain;
 import soot.util.HashMultiMap;
 import soot.util.MultiMap;
+import soot.Value;
+import soot.Type;
+import soot.RefLikeType;
+import soot.jimple.NullConstant;
+import soot.jimple.IntConstant;
+import soot.jimple.LongConstant;
+import soot.jimple.DoubleConstant;
+import soot.jimple.FloatConstant;
 
 public class IccInstrumenter implements PreAnalysisHandler {
 
@@ -38,6 +46,12 @@ public class IccInstrumenter implements PreAnalysisHandler {
 	protected final SootMethod smMessengerSend;
 	protected final Set<SootMethod> processedMethods = new HashSet<>();
 	protected final MultiMap<Body, Unit> instrumentedUnits = new HashMultiMap<>();
+
+	protected List<String> handlerCallbackInfos = null;
+
+	public void setHandlerCallbackInfos(List<String> handlerCallbackInfos) {
+		this.handlerCallbackInfos = handlerCallbackInfos;
+	}
 
 	public IccInstrumenter(String iccModel, SootClass dummyMainClass,
 			ComponentEntryPointCollection componentToEntryPoint) {
@@ -96,67 +110,79 @@ public class IccInstrumenter implements PreAnalysisHandler {
 		instrumentedUnits.clear();
 	}
 
+	private static Set<String> sendMessageMethods = new HashSet<>();
+
+	static {
+		sendMessageMethods.add("<android.os.Handler: void dispatchMessage(android.os.Message)>");
+		sendMessageMethods.add("<android.os.Handler: boolean sendMessage(android.os.Message)>");
+		sendMessageMethods.add("<android.os.Handler: boolean sendMessageAtFrontOfQueue(android.os.Message)>");
+		sendMessageMethods.add("<android.os.Handler: boolean sendMessageAtTime(android.os.Message,long)>");
+		sendMessageMethods.add("<android.os.Handler: boolean sendMessageDelayed(android.os.Message,long)>");
+		sendMessageMethods.add("<android.os.Messenger: void send(android.os.Message)>");
+	}
+
 	protected void instrumentMessenger() {
 		logger.info("Launching Messenger Transformer...");
 
-		Chain<SootClass> applicationClasses = Scene.v().getApplicationClasses();
-		for (Iterator<SootClass> iter = applicationClasses.snapshotIterator(); iter.hasNext();) {
-			SootClass sootClass = iter.next();
+		if(this.handlerCallbackInfos == null) return;
+		for(String infoStr: this.handlerCallbackInfos) {
+			HandlerCallbackInfo info = HandlerCallbackInfo.parse(infoStr);
+			SootMethod container = info.getSinkMethod();
+			int sequence = info.getSinkUnitID();
+			List<SootMethod> callbacks = info.getCallbacks();
 
-			// We copy the list of methods to emulate a snapshot iterator which
-			// doesn't exist for methods in Soot
-			List<SootMethod> methodCopyList = new ArrayList<>(sootClass.getMethods());
-			for (SootMethod sootMethod : methodCopyList) {
-				if (sootMethod.isConcrete()) {
-					final Body body = sootMethod.retrieveActiveBody();
-					final LocalGenerator lg = Scene.v().createLocalGenerator(body);
+			final Body body = container.retrieveActiveBody();
+			final LocalGenerator lg = Scene.v().createLocalGenerator(body);
+			int i = 0;
+			for (Iterator<Unit> unitIter = body.getUnits().snapshotIterator(); unitIter.hasNext();) {
+				Stmt stmt = (Stmt) unitIter.next();
+				if(! stmt.containsInvokeExpr()) continue;
+				if(sendMessageMethods.contains(stmt.getInvokeExpr().getMethod().getSignature())) i++;
+				if(i == sequence) {
+					for(SootMethod callback: callbacks) {
+						Local handlerLocal = lg.generateLocal(callback.getDeclaringClass().getType());
 
-					// Mark the method as processed
-					if (!processedMethods.add(sootMethod))
-						continue;
+						Unit callHMU = Jimple.v().newInvokeStmt(Jimple.v().newVirtualInvokeExpr(handlerLocal, callback.makeRef(), stmt.getInvokeExpr().getArg(0)));
+						callHMU.addTag(SimulatedCodeElementTag.TAG);
+						body.getUnits().insertAfter(callHMU, stmt);
+						instrumentedUnits.put(body, callHMU);
 
-					for (Iterator<Unit> unitIter = body.getUnits().snapshotIterator(); unitIter.hasNext();) {
-						Stmt stmt = (Stmt) unitIter.next();
 
-						if (stmt.containsInvokeExpr()) {
-							SootMethod callee = stmt.getInvokeExpr().getMethod();
-
-							// For Messenger.send(), we directly call the respective handler
-							if (callee == smMessengerSend) {
-								Set<SootClass> handlers = MessageHandler.v().getAllHandlers();
-								for (SootClass handler : handlers) {
-									Local handlerLocal = lg.generateLocal(handler.getType());
-
-									Unit newU = Jimple.v().newAssignStmt(handlerLocal,
-											Jimple.v().newNewExpr(handler.getType()));
-									newU.addTag(SimulatedCodeElementTag.TAG);
-									body.getUnits().insertAfter(newU, stmt);
-									instrumentedUnits.put(body, newU);
-
-									SootMethod initMethod = handler.getMethod("void <init>()");
-									Unit initU = Jimple.v().newInvokeStmt(
-											Jimple.v().newSpecialInvokeExpr(handlerLocal, initMethod.makeRef()));
-									initU.addTag(SimulatedCodeElementTag.TAG);
-									body.getUnits().insertAfter(initU, newU);
-									instrumentedUnits.put(body, initU);
-
-									SootMethod hmMethod = handler.getMethod("void handleMessage(android.os.Message)");
-									Unit callHMU = Jimple.v().newInvokeStmt(Jimple.v().newVirtualInvokeExpr(
-											handlerLocal, hmMethod.makeRef(), stmt.getInvokeExpr().getArg(0)));
-									callHMU.addTag(SimulatedCodeElementTag.TAG);
-									body.getUnits().insertAfter(callHMU, initU);
-									instrumentedUnits.put(body, callHMU);
-								}
+						SootMethod initMethod = null;
+						for(SootMethod mtd: callback.getDeclaringClass().getMethods()) {
+							if(mtd.getName().equals("<init>")) {
+								initMethod = mtd;
+								break;
 							}
 						}
+						List<Value> args = new ArrayList<>();
+						for(Type paraType: initMethod.getParameterTypes()) {
+							switch(paraType.toString()) {
+								case "byte": args.add(IntConstant.v(0)); break;
+								case "short": args.add(IntConstant.v(0)); break;
+								case "int": args.add(IntConstant.v(0)); break;
+								case "long": args.add(LongConstant.v(0)); break;
+								case "float": args.add(FloatConstant.v(0)); break;
+								case "double": args.add(DoubleConstant.v(0)); break;
+								case "boolean": args.add(IntConstant.v(0)); break;
+								case "char": args.add(IntConstant.v(0)); break;
+								default: args.add(NullConstant.v()); break;
+							}
+						}
+						Unit initU = Jimple.v().newInvokeStmt(Jimple.v().newSpecialInvokeExpr(handlerLocal, initMethod.makeRef(), args));
+						initU.addTag(SimulatedCodeElementTag.TAG);
+						body.getUnits().insertAfter(initU, stmt);
+						instrumentedUnits.put(body, initU);
+
+						Unit newU = Jimple.v().newAssignStmt(handlerLocal, Jimple.v().newNewExpr(callback.getDeclaringClass().getType()));
+						newU.addTag(SimulatedCodeElementTag.TAG);
+						body.getUnits().insertAfter(newU, stmt);
+						instrumentedUnits.put(body, newU);
 					}
-
-					body.validate();
+					break;
 				}
-
 			}
 		}
-
 	}
 
 	@Override

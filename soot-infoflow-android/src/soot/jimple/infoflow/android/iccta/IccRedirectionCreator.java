@@ -78,7 +78,8 @@ public class IccRedirectionCreator {
 
 	protected final SootClass dummyMainClass;
 	protected final ComponentEntryPointCollection componentToEntryPoint;
-	protected final NumberedString subsigStartActivityForResult;
+	protected final NumberedString subsigStartActivityForResult1;
+	protected final NumberedString subsigStartActivityForResult2;
 
 	protected IRedirectorCallInserted instrumentationCallback = null;
 
@@ -86,8 +87,10 @@ public class IccRedirectionCreator {
 		this.componentToEntryPoint = componentToEntryPoint;
 		this.dummyMainClass = dummyMainClass;
 
-		subsigStartActivityForResult = Scene.v().getSubSigNumberer()
+		subsigStartActivityForResult1 = Scene.v().getSubSigNumberer()
 				.findOrAdd("void startActivityForResult(android.content.Intent,int)");
+		subsigStartActivityForResult2 = Scene.v().getSubSigNumberer()
+				.findOrAdd("void startActivityForResult(android.content.Intent,int,android.os.Bundle)");
 	}
 
 	public void redirectToDestination(IccLink link) {
@@ -430,7 +433,7 @@ public class IccRedirectionCreator {
 		// specially deal with startActivityForResult since they have two
 		// parameters
 		List<Value> args = new ArrayList<>();
-		if (callee.getNumberedSubSignature().equals(subsigStartActivityForResult)) {
+		if (callee.getNumberedSubSignature().equals(subsigStartActivityForResult1) || callee.getNumberedSubSignature().equals(subsigStartActivityForResult2)) {
 			InstanceInvokeExpr iiexpr = (InstanceInvokeExpr) fromStmt.getInvokeExpr();
 			args.add(iiexpr.getBase());
 			args.add(iiexpr.getArg(0));

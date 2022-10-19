@@ -114,7 +114,7 @@ public class ContextSensitivePathBuilder extends ConcurrentAbstractionPathBuilde
 			if (extendedScap == null)
 				return false;
 
-			// for Forwards
+			// Do we process a method return?
 			if (pred.getCurrentStmt() != null && pred.getCurrentStmt().containsInvokeExpr()) {
 				// Pop the top item off the call stack. This gives us the item
 				// and the new SCAP without the item we popped off.
@@ -129,16 +129,6 @@ public class ContextSensitivePathBuilder extends ConcurrentAbstractionPathBuilde
 					extendedScap = pathAndItem.getO1();
 				}
 			}
-
-			// for Backwards
-			// if (pred.getCorrespondingCallSite() != null && pred.getCorrespondingCallSite() != pred.getCurrentStmt()) {
-			// 	Pair<SourceContextAndPath, Stmt> pathAndItem = extendedScap.popTopCallStackItem();
-			// 	if (pathAndItem != null) {
-			// 		Stmt topCallStackItem = pathAndItem.getO2();
-			// 		if (topCallStackItem != pred.getCorrespondingCallSite()) return false;
-			// 		extendedScap = pathAndItem.getO1();
-			// 	}
-			// }
 
 			// Add the new path
 			checkForSource(pred, extendedScap);

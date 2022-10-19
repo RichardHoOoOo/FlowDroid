@@ -148,7 +148,6 @@ public class SinkPropagationRule extends AbstractTaintPropagationRule {
 				if (ssm != null) {
 					// Get the sink descriptor
 					SinkInfo sinkInfo = ssm.getSinkInfo(stmt, getManager(), source.getAccessPath());
-
 					// If we have already seen the same taint at the same sink, there is no need to
 					// propagate this taint any further.
 					if (sinkInfo != null

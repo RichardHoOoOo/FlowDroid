@@ -121,6 +121,13 @@ public abstract class AbstractCallbackAnalyzer {
 
 	protected final SootClass viewGroup = Scene.v().getSootClassUnsafe("android.view.ViewGroup");
 
+	protected final SootClass adapter = Scene.v().getSootClassUnsafe("android.widget.Adapter");
+	protected final SootClass expandableListAdapter = Scene.v().getSootClassUnsafe("android.widget.ExpandableListAdapter");
+	protected final SootClass spinnerAdapter = Scene.v().getSootClassUnsafe("android.widget.SpinnerAdapter");
+	protected final SootClass simpleExpandableListAdapter = Scene.v().getSootClassUnsafe("android.widget.SimpleExpandableListAdapter");
+	protected final SootClass resourceCursorTreeAdapter = Scene.v().getSootClassUnsafe("android.widget.ResourceCursorTreeAdapter");
+	protected final SootClass cursorAdapter = Scene.v().getSootClassUnsafe("android.widget.CursorAdapter");
+
 	protected final InfoflowAndroidConfiguration config;
 	protected final Set<SootClass> entryPointClasses;
 	protected final Set<String> androidCallbacks;
@@ -391,16 +398,72 @@ public abstract class AbstractCallbackAnalyzer {
 	 */
 	private boolean matchCorrespondingRegisterMethod(SootMethod registerMethod, RefType listenerType) {
 		String listenerTypeStr = listenerType.getSootClass().getName();
+		String registerMethodSig = registerMethod.getSignature();
+
 		if(listenerTypeStr.equals("android.support.v4.view.PagerAdapter") 
 		|| listenerTypeStr.equals("androidx.viewpager.widget.PagerAdapter")
 		|| listenerTypeStr.equals("androidx.recyclerview.widget.RecyclerView$Adapter")) {
-			String registerMethodSig = registerMethod.getSignature();
 			if(registerMethodSig.equals("<androidx.viewpager.widget.ViewPager: void setAdapter(androidx.viewpager.widget.PagerAdapter)>") 
 			|| registerMethodSig.equals("<android.support.v4.view.ViewPager: void setAdapter(android.support.v4.view.PagerAdapter)>")
 			|| registerMethodSig.equals("<androidx.viewpager2.widget.ViewPager2: void setAdapter(androidx.recyclerview.widget.RecyclerView$Adapter)>")) return true;
 			else return false;
 		}
+
 		return true;
+	}
+
+	protected void analyzeMethodForAdapterViews(SootClass lifecycleElement, SootMethod method) {
+		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName())) return;
+
+		if (!method.isConcrete()) return;
+
+		boolean extendsAdapter = adapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), adapter.getType());
+		extendsAdapter |= expandableListAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), expandableListAdapter.getType());
+		extendsAdapter |= spinnerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), spinnerAdapter.getType());
+		extendsAdapter |= simpleExpandableListAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), simpleExpandableListAdapter.getType());
+		extendsAdapter |= resourceCursorTreeAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), resourceCursorTreeAdapter.getType());
+		extendsAdapter |= cursorAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), cursorAdapter.getType());
+
+		if(! extendsAdapter) return;
+
+		boolean isGetView = method.getSubSignature().equals("android.view.View getView(int,android.view.View,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View getChildView(int,int,boolean,android.view.View,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View getGroupView(int,boolean,android.view.View,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View getDropDownView(int,android.view.View,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View newChildView(boolean,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View newGroupView(boolean,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View newChildView(android.content.Context,android.database.Cursor,boolean,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View newGroupView(android.content.Context,android.database.Cursor,boolean,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View newDropDownView(android.content.Context,android.database.Cursor,android.view.ViewGroup)");
+		isGetView |= method.getSubSignature().equals("android.view.View newView(android.content.Context,android.database.Cursor,android.view.ViewGroup)");
+
+		if(! isGetView) return;
+
+		Body body = method.retrieveActiveBody();
+
+		if(body == null) return;
+
+		Set<SootClass> components = findDeclaringComponents(method);
+		for (Unit u : body.getUnits()) {
+			if (u instanceof ReturnStmt) {
+				ReturnStmt rs = (ReturnStmt) u;
+				Value rv = rs.getOp();
+				if (rv instanceof Local && rv.getType() instanceof RefType) {
+					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) rv).possibleTypes();
+					if(possibleTypes.isEmpty()) {
+						for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) rv.getType()).getSootClass());
+					} else {
+						for(Type possibleType: possibleTypes) {
+							if(possibleType instanceof RefType) {
+								for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+							} else if (possibleType instanceof AnySubType) {
+								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass());
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	protected void analyzeMethodForAddView(SootClass lifecycleElement, SootMethod method) {

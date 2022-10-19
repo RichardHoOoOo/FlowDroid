@@ -19,6 +19,16 @@
 				</flow>
 			</flows>
 		</method>
+		<method id="void setData(android.os.Bundle)">
+			<flows>
+				<flow isAlias="false" typeChecking="false">
+					<from sourceSinkType="Parameter" ParameterIndex="0" />
+					<to sourceSinkType="Field"
+						AccessPath="[android.os.Message: android.os.Bundle data]"
+						AccessPathTypes="[android.os.Bundle]" />
+				</flow>
+			</flows>
+		</method>
 		<method id="long getWhen()">
 			<flows>
 				<flow isAlias="false">
@@ -130,16 +140,6 @@
 						AccessPath="[android.os.Message: android.os.Bundle data]"
 						AccessPathTypes="[android.os.Bundle]" />
 					<to sourceSinkType="Return" />
-				</flow>
-			</flows>
-		</method>
-		<method id="void getData(android.os.Bundle)">
-			<flows>
-				<flow isAlias="false">
-					<from sourceSinkType="Parameter" ParameterIndex="0" />
-					<to sourceSinkType="Field"
-						AccessPath="[android.os.Message: android.os.Bundle data]"
-						AccessPathTypes="[android.os.Bundle]" />
 				</flow>
 			</flows>
 		</method>

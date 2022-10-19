@@ -145,6 +145,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		this.additionalCallbacks = additionalCallbacks;
 	}
 
+	protected List<String> handlerCallbackInfos = null;
+
+	public void setHandlerCallbackInfos(List<String> handlerCallbackInfos) {
+		this.handlerCallbackInfos = handlerCallbackInfos;
+	}
+
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -638,6 +644,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		iccInstrumenter = new IccInstrumenter(config.getIccConfig().getIccModel(),
 				entryPointCreator.getGeneratedMainMethod().getDeclaringClass(),
 				entryPointCreator.getComponentToEntryPointInfo());
+		iccInstrumenter.setHandlerCallbackInfos(this.handlerCallbackInfos);
 		return iccInstrumenter;
 	}
 

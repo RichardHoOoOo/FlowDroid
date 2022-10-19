@@ -24,6 +24,9 @@ public class SystemClassHandler {
 
 	private boolean excludeSystemComponents = true;
 
+	public static String appType;
+	public static String[] appOrLibPkgs;
+
 	/**
 	 * Gets the global system class handler instance
 	 * 
@@ -54,18 +57,39 @@ public class SystemClassHandler {
 		return clazz != null && isClassInSystemPackage(clazz.getName());
 	}
 
-	/**
-	 * Checks whether the given class name belongs to a system package
-	 * 
-	 * @param className The class name to check
-	 * @return True if the given class name belongs to a system package, otherwise
-	 *         false
-	 */
+	// /**
+	//  * Checks whether the given class name belongs to a system package
+	//  * 
+	//  * @param className The class name to check
+	//  * @return True if the given class name belongs to a system package, otherwise
+	//  *         false
+	//  */
+	// public boolean isClassInSystemPackage(String className) {
+	// 	return (className.startsWith("android.") || className.startsWith("androidx.") || className.startsWith("java.") || className.startsWith("javax.")
+	// 			|| className.startsWith("sun.") || className.startsWith("org.omg.")
+	// 			|| className.startsWith("org.w3c.dom.") || className.startsWith("com.google.")
+	// 			|| className.startsWith("com.android.")) && this.excludeSystemComponents;
+	// }
+
 	public boolean isClassInSystemPackage(String className) {
-		return (className.startsWith("android.") || className.startsWith("androidx.") || className.startsWith("java.") || className.startsWith("javax.")
-				|| className.startsWith("sun.") || className.startsWith("org.omg.")
-				|| className.startsWith("org.w3c.dom.") || className.startsWith("com.google.")
-				|| className.startsWith("com.android.")) && this.excludeSystemComponents;
+		if(! this.excludeSystemComponents) return false;
+		if(className.startsWith("android.") || className.startsWith("androidx.") || className.startsWith("java.") || className.startsWith("javax.")
+			|| className.startsWith("sun.") || className.startsWith("jdk.") || className.startsWith("dalvik.") || className.startsWith("junit.") 
+			|| className.startsWith("org.apache.") || className.startsWith("org.json.") ||className.startsWith("org.omg.") || className.startsWith("org.w3c.dom.") 
+			|| className.startsWith("org.xml.sax.") || className.startsWith("org.xmlpull.v1.") || className.startsWith("org.chromium.support_lib_boundary.") 
+			|| className.startsWith("com.google.") || className.startsWith("kotlin.") || className.startsWith("kotlinx.") || className.startsWith("okhttp3.")
+			|| className.startsWith("com.android.") || className.startsWith("org.eclipse.") || className.startsWith("soot.")) return true;
+		if(appType.equals("OPEN_SOURCE")) {
+			for(String appPkg: appOrLibPkgs) {
+				if(className.startsWith(appPkg)) return false;
+			}
+			return true;
+		} else {
+			for(String libPkg: appOrLibPkgs) {
+				if(className.startsWith(libPkg)) return true;
+			}
+			return false;
+		}
 	}
 
 	/**

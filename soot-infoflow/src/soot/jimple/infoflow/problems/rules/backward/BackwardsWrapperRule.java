@@ -123,25 +123,23 @@ public class BackwardsWrapperRule extends AbstractTaintPropagationRule {
 
 		Set<Abstraction> res = wrapper.getInverseTaintsForMethod(stmt, d1, source);
 		if (res != null) {
-			Set<Abstraction> resWAliases = new HashSet<>();
+			Set<Abstraction> resWAliases = new HashSet<>(res);
 
 			SootMethod sm = manager.getICFG().getMethodOf(stmt);
 			boolean intraTurnUnit = source.getTurnUnit() != null
 					&& manager.getICFG().getMethodOf(source.getTurnUnit()) == sm;
 			for (Abstraction abs : res) {
 				AccessPath absAp = abs.getAccessPath();
-				boolean addAbstraction = true;
 				// Tainted return values are only sent to alias analysis but never upward
 				if (leftOp != null && aliasing.mayAlias(leftOp, absAp.getPlainValue())) {
 					Value rightOp = ((AssignStmt) stmt).getRightOp();
 					boolean localNotReused = rightOp.getUseBoxes().stream()
 							.noneMatch(box -> aliasing.mayAlias(box.getValue(), absAp.getPlainValue()));
 					if (localNotReused)
-						addAbstraction = false;
+						resWAliases.remove(abs);
 				}
 
 				// Primitive Assignment -> set turn unit
-				boolean performAliasSearch = false;
 				if (retValTainted && leftOp != null) {
 					Type t;
 					if (leftOp instanceof FieldRef)
@@ -151,41 +149,37 @@ public class BackwardsWrapperRule extends AbstractTaintPropagationRule {
 					boolean setTurnUnit = t instanceof PrimType
 							|| (TypeUtils.isStringType(t) && !absAp.getCanHaveImmutableAliases());
 					if (setTurnUnit) {
-						abs = abs.deriveNewAbstractionWithTurnUnit(stmt);
-						performAliasSearch = false;
+						abs.setTurnUnit(stmt);
+						continue;
 					}
 				}
 
-				if (performAliasSearch) {
-					// no need to search for aliases if the access path didn't change
-					if (!absAp.equals(sourceAp) && !absAp.isEmpty()
-							&& !(retValTainted && intraTurnUnit && canOmitAliasing(abs, stmt, sm))) {
-						boolean isBasicString = TypeUtils.isStringType(absAp.getBaseType())
-								&& !absAp.getCanHaveImmutableAliases() && !getAliasing().isStringConstructorCall(stmt);
-						boolean taintsObjectValue = absAp.getBaseType() instanceof RefType && !isBasicString
-								&& (absAp.getFragmentCount() > 0 || absAp.getTaintSubFields());
-						boolean taintsStaticField = getManager().getConfig()
-								.getStaticFieldTrackingMode() != InfoflowConfiguration.StaticFieldTrackingMode.None
-								&& abs.getAccessPath().isStaticFieldRef()
-								&& !(absAp.getFirstFieldType() instanceof PrimType)
-								&& !(TypeUtils.isStringType(absAp.getFirstFieldType()));
+				// no need to search for aliases if the access path didn't change
+				if (!absAp.equals(sourceAp) && !absAp.isEmpty()
+						&& !(retValTainted && intraTurnUnit && canOmitAliasing(abs, stmt, sm))) {
+					boolean isBasicString = TypeUtils.isStringType(absAp.getBaseType())
+							&& !absAp.getCanHaveImmutableAliases() && !getAliasing().isStringConstructorCall(stmt);
+					boolean taintsObjectValue = absAp.getBaseType() instanceof RefType && !isBasicString
+							&& (absAp.getFragmentCount() > 0 || absAp.getTaintSubFields());
+					boolean taintsStaticField = getManager().getConfig()
+							.getStaticFieldTrackingMode() != InfoflowConfiguration.StaticFieldTrackingMode.None
+							&& abs.getAccessPath().isStaticFieldRef()
+							&& !(absAp.getFirstFieldType() instanceof PrimType)
+							&& !(TypeUtils.isStringType(absAp.getFirstFieldType()));
 
-						if (taintsObjectValue || taintsStaticField
-								|| aliasing.canHaveAliasesRightSide(stmt, abs.getAccessPath().getPlainValue(), abs)) {
-							for (Unit pred : manager.getICFG().getPredsOf(stmt))
-								aliasing.computeAliases(d1, (Stmt) pred, absAp.getPlainValue(), resWAliases,
-										getManager().getICFG().getMethodOf(pred), abs);
-						} else {
-							abs = abs.deriveNewAbstractionWithTurnUnit(stmt);
-						}
+					if (taintsObjectValue || taintsStaticField
+							|| aliasing.canHaveAliasesRightSide(stmt, abs.getAccessPath().getPlainValue(), abs)) {
+						for (Unit pred : manager.getICFG().getPredsOf(stmt))
+							aliasing.computeAliases(d1, (Stmt) pred, absAp.getPlainValue(), resWAliases,
+									getManager().getICFG().getMethodOf(pred), abs);
+					} else {
+						abs.setTurnUnit(stmt);
 					}
-
-					if (!killSource.value && absAp.equals(sourceAp))
-						killSource.value = source != abs;
 				}
 
-				if (addAbstraction)
-					resWAliases.add(abs);
+				if (!killSource.value && absAp.equals(sourceAp))
+					killSource.value = source != abs;
+
 			}
 			res = resWAliases;
 		}

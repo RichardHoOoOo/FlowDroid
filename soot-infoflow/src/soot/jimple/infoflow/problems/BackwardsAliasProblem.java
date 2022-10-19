@@ -693,9 +693,9 @@ public class BackwardsAliasProblem extends AbstractInfoflowProblem {
 									// if we find an alias above, which is the an argument of arraycopy,
 									// the native stmt does not create a new alias but we notice that we
 									// missed this argument in the infoflow search.
-									Abstraction newSource = source.deriveNewAbstractionWithTurnUnit(callSite);
+									source.setTurnUnit(callSite);
 									manager.getForwardSolver()
-											.processEdge(new PathEdge<>(d1, callSite, newSource.getActiveCopy()));
+											.processEdge(new PathEdge<>(d1, callSite, source.getActiveCopy()));
 									return null;
 								}
 							}

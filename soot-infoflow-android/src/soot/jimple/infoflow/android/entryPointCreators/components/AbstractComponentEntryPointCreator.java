@@ -255,6 +255,7 @@ public abstract class AbstractComponentEntryPointCreator extends AbstractAndroid
 	 * Code adapted from FlowDroid v2.0.
 	 */
 	public void assignIntent(SootClass hostComponent, SootMethod method, int indexOfArgs) {
+		if(method.getSubSignature().equals("void onActivityResult(int,int,android.content.Intent)")) return;
 		if (!method.isStatic()) {
 			JimpleBody body = (JimpleBody) method.retrieveActiveBody();
 

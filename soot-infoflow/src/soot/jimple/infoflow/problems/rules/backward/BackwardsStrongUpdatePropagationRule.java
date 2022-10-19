@@ -4,22 +4,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 
-import soot.ArrayType;
- import soot.Local;
- import soot.PrimType;
- import soot.SootMethod;
- import soot.Type;
- import soot.Unit;
- import soot.Value;
- import soot.jimple.AnyNewExpr;
- import soot.jimple.ArrayRef;
- import soot.jimple.AssignStmt;
- import soot.jimple.Constant;
- import soot.jimple.FieldRef;
- import soot.jimple.InstanceFieldRef;
- import soot.jimple.ReturnStmt;
- import soot.jimple.StaticFieldRef;
- import soot.jimple.Stmt;
+import soot.*;
+import soot.jimple.*;
 import soot.jimple.infoflow.InfoflowManager;
 import soot.jimple.infoflow.aliasing.Aliasing;
 import soot.jimple.infoflow.data.Abstraction;
@@ -130,7 +116,7 @@ public class BackwardsStrongUpdatePropagationRule extends AbstractTaintPropagati
 
 			if (newAbs != null) {
 				if (type instanceof PrimType || TypeUtils.isStringType(type))
-					newAbs = newAbs.deriveNewAbstractionWithTurnUnit(assignStmt);
+					newAbs.setTurnUnit(assignStmt);
 				else {
 					if (getAliasing().canHaveAliasesRightSide(assignStmt, rightVal, newAbs)) {
 						for (Unit pred : manager.getICFG().getPredsOf(assignStmt))
@@ -188,7 +174,7 @@ public class BackwardsStrongUpdatePropagationRule extends AbstractTaintPropagati
 						Abstraction abs = source.deriveNewAbstraction(ap, stmt);
 						if (abs != null) {
 							if (type instanceof PrimType || TypeUtils.isStringType(type))
-								abs = abs.deriveNewAbstractionWithTurnUnit(stmt);
+								abs.setTurnUnit(stmt);
 
 							abs.setCorrespondingCallSite(stmt);
 							res.add(abs);
