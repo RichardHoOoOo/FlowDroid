@@ -510,20 +510,43 @@ public abstract class AbstractCallbackAnalyzer {
 
 	private void checkAndAddViewCallbacks(SootClass callbackClass, SootClass viewClass) {
 		Map<String, SootMethod> systemMethods = new HashMap<>(10000);
+		Set<SootClass> interfaces = collectAllInterfaces(viewClass);
+		for(SootClass i: interfaces) {
+			if(i.getName().startsWith("android.") || i.getName().startsWith("androidx.")) {
+				for (SootMethod sm : i.getMethods())
+					if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate()) systemMethods.put(sm.getSubSignature(), sm);
+			}
+		}
 		for (SootClass parentClass : Scene.v().getActiveHierarchy().getSuperclassesOf(viewClass)) {
-			if (parentClass.getName().startsWith("android."))
+			if (! SystemClassHandler.v().isClassInSystemPackage(parentClass.getName())) {
+				Set<SootClass> is = collectAllInterfaces(parentClass);
+				for(SootClass i: is) {
+					if(i.getName().startsWith("android.") || i.getName().startsWith("androidx.")) {
+						for (SootMethod sm : i.getMethods())
+							if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate()) systemMethods.put(sm.getSubSignature(), sm);
+					}
+				}
+			}
+			if (parentClass.getName().startsWith("android.") || parentClass.getName().startsWith("androidx."))
 				for (SootMethod sm : parentClass.getMethods())
-					if (!sm.isConstructor())
+					if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate())
 						systemMethods.put(sm.getSubSignature(), sm);
 		}
 		// Scan for methods that overwrite parent class methods
-		for (SootMethod sm : viewClass.getMethods()) {
-			if (!sm.isConstructor()) {
-				SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
-				if (parentMethod != null) {
-					this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+		SootClass tmp = viewClass;
+		while(true) {
+			if(SystemClassHandler.v().isClassInSystemPackage(tmp.getName())) break;
+			for (SootMethod sm : tmp.getMethods()) {
+				if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isPrivate()) {
+					SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
+					if (parentMethod != null) {
+						this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+						systemMethods.remove(sm.getSubSignature());
+					}
 				}
 			}
+			if(tmp.hasSuperclass()) tmp = tmp.getSuperclass();
+			else break;
 		}
 	}
 
@@ -917,7 +940,7 @@ public abstract class AbstractCallbackAnalyzer {
 		for (SootClass parentClass : Scene.v().getActiveHierarchy().getSuperclassesOf(sootClass)) {
 			if (SystemClassHandler.v().isClassInSystemPackage(parentClass.getName()))
 				for (SootMethod sm : parentClass.getMethods())
-					if (!sm.isConstructor())
+					if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate())
 						systemMethods.put(sm.getSubSignature(), sm);
 		}
 
@@ -1042,7 +1065,7 @@ public abstract class AbstractCallbackAnalyzer {
 			return false;
 
 		// Skip constructors
-		if (method.isConstructor() || method.isStaticInitializer())
+		if (method.isConstructor() || method.isStaticInitializer() || method.isStatic() || method.isPrivate())
 			return false;
 
 		// Check the filters

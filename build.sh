@@ -33,3 +33,6 @@ mvn -DskipTests install
 cp soot-infoflow/target/soot-infoflow-classes.jar ../
 cp soot-infoflow-android/target/soot-infoflow-android-classes.jar ../
 cp soot-infoflow-summaries/target/soot-infoflow-summaries-classes.jar ../
+
+rm ../AndroidCallbacks.txt
+cp soot-infoflow-android/AndroidCallbacks.txt ../

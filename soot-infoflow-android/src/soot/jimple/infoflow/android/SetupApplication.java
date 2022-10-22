@@ -1061,6 +1061,13 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		constructCallgraphInternal();
 	}
 
+	private Set<SootClass> collectAllInterfaces(SootClass sootClass) {
+		Set<SootClass> interfaces = new HashSet<SootClass>(sootClass.getInterfaces());
+		for (SootClass i : sootClass.getInterfaces())
+			interfaces.addAll(collectAllInterfaces(i));
+		return interfaces;
+	}
+
 	/**
 	 * Registers the callback methods in the given layout control so that they are
 	 * included in the dummy main method
@@ -1089,24 +1096,47 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		// Android OS class, we treat it as a potential callback.
 		SootClass sc = lc.getViewClass();
 		Map<String, SootMethod> systemMethods = new HashMap<>(10000);
+		Set<SootClass> interfaces = collectAllInterfaces(sc);
+		for(SootClass i: interfaces) {
+			if(i.getName().startsWith("android.") || i.getName().startsWith("androidx.")) {
+				for (SootMethod sm : i.getMethods())
+					if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate()) systemMethods.put(sm.getSubSignature(), sm);
+			}
+		}
 		for (SootClass parentClass : Scene.v().getActiveHierarchy().getSuperclassesOf(sc)) {
-			if (parentClass.getName().startsWith("android."))
+			if (! SystemClassHandler.v().isClassInSystemPackage(parentClass.getName())) {
+				Set<SootClass> is = collectAllInterfaces(parentClass);
+				for(SootClass i: is) {
+					if(i.getName().startsWith("android.") || i.getName().startsWith("androidx.")) {
+						for (SootMethod sm : i.getMethods())
+							if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate()) systemMethods.put(sm.getSubSignature(), sm);
+					}
+				}
+			}
+			if (parentClass.getName().startsWith("android.") || parentClass.getName().startsWith("androidx."))
 				for (SootMethod sm : parentClass.getMethods())
-					if (!sm.isConstructor())
+					if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate())
 						systemMethods.put(sm.getSubSignature(), sm);
 		}
 
 		boolean changed = false;
 		// Scan for methods that overwrite parent class methods
-		for (SootMethod sm : sc.getMethods()) {
-			if (!sm.isConstructor()) {
-				SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
-				if (parentMethod != null) {
-					// This is a real callback method
-					changed |= this.callbackMethods.put(callbackClass,
-							new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+		SootClass tmp = sc;
+		while(true) {
+			if(SystemClassHandler.v().isClassInSystemPackage(tmp.getName())) break;
+			for (SootMethod sm : tmp.getMethods()) {
+				if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isPrivate()) {
+					SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
+					if (parentMethod != null) {
+						// This is a real callback method
+						changed |= this.callbackMethods.put(callbackClass,
+								new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+						systemMethods.remove(sm.getSubSignature());
+					}
 				}
 			}
+			if(tmp.hasSuperclass()) tmp = tmp.getSuperclass();
+			else break;
 		}
 		return changed;
 	}

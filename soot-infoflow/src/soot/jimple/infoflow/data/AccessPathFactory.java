@@ -364,6 +364,7 @@ public class AccessPathFactory {
 				if (fragments.length > fieldNum) {
 					taintSubFields = true;
 					cutOffApproximation = true;
+					return null; // Totally drop the access path if the fragments' length exceeds the limit
 				} else {
 					cutOffApproximation = recursiveCutOff;
 				}

@@ -21,7 +21,7 @@
 		</method>
 		<method id="void setData(android.os.Bundle)">
 			<flows>
-				<flow isAlias="false" typeChecking="false">
+				<flow isAlias="false">
 					<from sourceSinkType="Parameter" ParameterIndex="0" />
 					<to sourceSinkType="Field"
 						AccessPath="[android.os.Message: android.os.Bundle data]"
