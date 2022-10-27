@@ -84,11 +84,14 @@ import soot.jimple.infoflow.values.IValueProvider;
 import soot.options.Options;
 import soot.util.HashMultiMap;
 import soot.util.MultiMap;
+import soot.jimple.JimpleBody;
+import soot.jimple.Jimple;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.lang.reflect.Modifier;
 
 public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
@@ -149,6 +152,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 	public void setHandlerCallbackInfos(List<String> handlerCallbackInfos) {
 		this.handlerCallbackInfos = handlerCallbackInfos;
+	}
+
+	protected Set<String> usedFragments = null;
+
+	public void setUsedFragments(Set<String> usedFragments) {
+		this.usedFragments = usedFragments;
 	}
 
 	/**
@@ -648,6 +657,30 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		return iccInstrumenter;
 	}
 
+	private void createADummyActivity() {
+		if(this.usedFragments == null || this.usedFragments.isEmpty()) return;
+		
+		SootClass dummyActivity = new SootClass("com.wTest.wTestDummyActivity", Modifier.PUBLIC);
+		dummyActivity.setSuperclass(Scene.v().getSootClass("android.app.Activity"));
+		dummyActivity.setApplicationClass();
+		Scene.v().addClass(dummyActivity);
+
+		SootMethod init = new SootMethod("<init>", new ArrayList<>(), VoidType.v(), Modifier.PUBLIC);
+		JimpleBody body = Jimple.v().newBody(init);
+		init.setActiveBody(body);
+		dummyActivity.addMethod(init);
+		Local thisLocal = Jimple.v().newLocal("l0", RefType.v("com.wTest.wTestDummyActivity"));
+		body.getLocals().add(thisLocal);
+		body.getUnits().add(Jimple.v().newIdentityStmt(thisLocal, Jimple.v().newThisRef(RefType.v("com.wTest.wTestDummyActivity"))));
+
+		this.entrypoints.add(dummyActivity);
+
+		for(String usedFragment: this.usedFragments) {
+			SootClass frag = Scene.v().getSootClassUnsafe(usedFragment);
+			if(frag != null) this.fragmentClasses.put(dummyActivity, frag);
+		}
+	}
+
 	/**
 	 * Calculates the set of callback methods declared in the XML resource files or
 	 * the app's source code
@@ -702,6 +735,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		}
 
 		try {
+			createADummyActivity();
 			int depthIdx = 0;
 			boolean hasChanged = true;
 			boolean isInitial = true;
