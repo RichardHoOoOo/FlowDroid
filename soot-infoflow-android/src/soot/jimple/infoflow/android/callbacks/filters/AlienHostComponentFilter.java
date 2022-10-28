@@ -1,6 +1,7 @@
 package soot.jimple.infoflow.android.callbacks.filters;
 
 import java.util.Set;
+import java.util.HashSet;
 
 import soot.RefType;
 import soot.Scene;
@@ -24,8 +25,9 @@ import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointConstant
 public class AlienHostComponentFilter extends AbstractCallbackFilter {
 
 	private SootClass activityClass;
-	private SootClass fragmentClass;
-	private final Set<SootClass> components;
+	private SootClass xfragmentClass;
+	private SootClass v4fragmentClass;
+	private Set<SootClass> components;
 
 	/**
 	 * Creates a new instance of the {@link AlienHostComponentFilter} class
@@ -33,7 +35,12 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 	 * @param components The set of components in the Android app
 	 */
 	public AlienHostComponentFilter(Set<SootClass> components) {
-		this.components = components;
+		this.components = new HashSet<>();
+		this.components.addAll(components);
+	}
+
+	public void addComponent(SootClass component) {
+		this.components.add(component);
 	}
 
 	@Override
@@ -43,14 +50,20 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 			return false;
 
 		// If we haven't been initialized before, we do that now
-		if (activityClass == null || fragmentClass == null)
+		if (activityClass == null || xfragmentClass == null || v4fragmentClass == null)
 			reset();
 
 		// If the callback class is a fragment, but the hosting component is not
 		// an activity, this association must be wrong.
-		if (fragmentClass != null && activityClass != null) {
+		if (xfragmentClass != null && activityClass != null) {
 			if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(),
-					this.fragmentClass.getType()))
+					this.xfragmentClass.getType()))
+				if (!Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), this.activityClass.getType()))
+					return false;
+		}
+		if (v4fragmentClass != null && activityClass != null) {
+			if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(),
+					this.v4fragmentClass.getType()))
 				if (!Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), this.activityClass.getType()))
 					return false;
 		}
@@ -110,7 +123,8 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 	@Override
 	public void reset() {
 		this.activityClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.ACTIVITYCLASS);
-		this.fragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.FRAGMENTCLASS);
+		this.xfragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.ANDROIDXFRAGMENTCLASS);
+		this.v4fragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.SUPPORTFRAGMENTCLASS);
 	}
 
 	@Override

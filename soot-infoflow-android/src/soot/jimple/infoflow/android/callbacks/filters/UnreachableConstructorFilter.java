@@ -4,6 +4,7 @@ import soot.RefType;
 import soot.Scene;
 import soot.SootClass;
 import soot.SootMethod;
+import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointConstants;
 
 /**
  * Filter for ruling out objects for which no factory method or allocation site
@@ -23,8 +24,11 @@ public class UnreachableConstructorFilter extends AbstractCallbackFilter {
 		// If the callback is in the component class itself, it is trivially reachable
 		if (component == callbackHandler)
 			return true;
-		RefType fragmentType = RefType.v("android.app.Fragment");
-		boolean isFragment = Scene.v().getFastHierarchy().canStoreType(callbackHandler.getType(), fragmentType);
+
+		SootClass xfragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.ANDROIDXFRAGMENTCLASS);
+		SootClass v4fragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.SUPPORTFRAGMENTCLASS);
+		boolean isFragment = xfragmentClass != null && Scene.v().getFastHierarchy().canStoreType(callbackHandler.getType(), xfragmentClass.getType());
+		isFragment |= v4fragmentClass != null && Scene.v().getFastHierarchy().canStoreType(callbackHandler.getType(), v4fragmentClass.getType());
 		if (isFragment)
 			// we cannot find constructors for these...
 			return true;

@@ -713,7 +713,8 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 				: new DefaultCallbackAnalyzer(config, entryPointClasses, callbackMethods, callbackClasses);
 		if (valueProvider != null)
 			jimpleClass.setValueProvider(valueProvider);
-		jimpleClass.addCallbackFilter(new AlienHostComponentFilter(entrypoints));
+		AlienHostComponentFilter alienHostComponentFilter = new AlienHostComponentFilter(entrypoints);
+		jimpleClass.addCallbackFilter(alienHostComponentFilter);
 		jimpleClass.addCallbackFilter(new ApplicationCallbackFilter(entrypoints));
 		jimpleClass.addCallbackFilter(new UnreachableConstructorFilter());
 		jimpleClass.setActivityNames(this.activityNames);
@@ -805,6 +806,13 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 				// Collect the XML-based callback methods
 				if (collectXmlBasedCallbackMethods(lfp, jimpleClass))
 					hasChanged = true;
+
+				for(SootClass entry: entrypoints) alienHostComponentFilter.addComponent(entry);
+				for(SootClass activityCls: fragmentClasses.keySet()) {
+					for(SootClass fragCls: fragmentClasses.get(activityCls)) {
+						alienHostComponentFilter.addComponent(fragCls);
+					}
+				}
 
 				// Avoid callback overruns. If we are beyond the callback limit
 				// for one entry point, we may not collect any further callbacks

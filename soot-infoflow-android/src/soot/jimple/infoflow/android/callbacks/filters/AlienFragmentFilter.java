@@ -15,7 +15,8 @@ import soot.util.MultiMap;
  */
 public class AlienFragmentFilter extends AbstractCallbackFilter {
 
-	private SootClass fragmentClass;
+	private SootClass xfragmentClass;
+	private SootClass v4fragmentClass;
 	private final MultiMap<SootClass, SootClass> fragmentToActivity;
 
 	/**
@@ -30,10 +31,13 @@ public class AlienFragmentFilter extends AbstractCallbackFilter {
 
 	@Override
 	public boolean accepts(SootClass component, SootClass callbackHandler) {
-		if (fragmentClass == null)
+		if (xfragmentClass == null && v4fragmentClass == null)
 			//No filtering possible
 			return true;
-		if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(), this.fragmentClass.getType()))
+		if (this.xfragmentClass != null && Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(), this.xfragmentClass.getType()))
+			if (!fragmentToActivity.get(callbackHandler).contains(component))
+				return false;
+		if (this.v4fragmentClass != null && Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(), this.v4fragmentClass.getType()))
 			if (!fragmentToActivity.get(callbackHandler).contains(component))
 				return false;
 		return true;
@@ -46,7 +50,8 @@ public class AlienFragmentFilter extends AbstractCallbackFilter {
 
 	@Override
 	public void reset() {
-		this.fragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.FRAGMENTCLASS);
+		this.xfragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.ANDROIDXFRAGMENTCLASS);
+		this.v4fragmentClass = Scene.v().getSootClassUnsafe(AndroidEntryPointConstants.SUPPORTFRAGMENTCLASS);
 	}
 
 }
