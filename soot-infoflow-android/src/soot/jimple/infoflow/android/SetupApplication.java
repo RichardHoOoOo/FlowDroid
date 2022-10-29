@@ -160,6 +160,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		this.usedFragments = usedFragments;
 	}
 
+	protected Set<SootClass> appComponents = new HashSet<>(); // this set includes activities, services, receivers, providers, and fragments
+
+	public Set<SootClass> getAppComponents() {
+		return this.appComponents;
+	}
+
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -807,10 +813,14 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 				if (collectXmlBasedCallbackMethods(lfp, jimpleClass))
 					hasChanged = true;
 
-				for(SootClass entry: entrypoints) alienHostComponentFilter.addComponent(entry);
+				for(SootClass entry: entrypoints) {
+					alienHostComponentFilter.addComponent(entry);
+					appComponents.add(entry);
+				}
 				for(SootClass activityCls: fragmentClasses.keySet()) {
 					for(SootClass fragCls: fragmentClasses.get(activityCls)) {
 						alienHostComponentFilter.addComponent(fragCls);
+						appComponents.add(fragCls);
 					}
 				}
 

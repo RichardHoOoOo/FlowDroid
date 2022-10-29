@@ -6,6 +6,9 @@ import soot.SootClass;
 import soot.SootMethod;
 import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointConstants;
 
+import java.util.Set;
+import java.util.HashSet;
+
 /**
  * Filter for ruling out objects for which no factory method or allocation site
  * is reachable in the current component
@@ -35,15 +38,13 @@ public class UnreachableConstructorFilter extends AbstractCallbackFilter {
 
 		{
 			SootClass curHandler = callbackHandler;
+			Set<SootClass> visited = new HashSet<>();
 			while (curHandler.isInnerClass()) {
+				if(! visited.add(curHandler)) break;
 				// Do not be overly aggressive for inner classes
 				SootClass outerClass = curHandler.getOuterClass();
 				if (component == outerClass)
 					return true;
-
-				// Make sure that we don't loop infinitely, even if everything is weird
-				if (curHandler == outerClass)
-					break;
 				curHandler = outerClass;
 			}
 		}

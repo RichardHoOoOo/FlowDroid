@@ -55,33 +55,31 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 
 		// If the callback class is a fragment, but the hosting component is not
 		// an activity, this association must be wrong.
-		if (xfragmentClass != null && activityClass != null) {
-			if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(),
-					this.xfragmentClass.getType()))
-				if (!Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), this.activityClass.getType()))
-					return false;
-		}
-		if (v4fragmentClass != null && activityClass != null) {
-			if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(),
-					this.v4fragmentClass.getType()))
-				if (!Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), this.activityClass.getType()))
-					return false;
-		}
+		// if (xfragmentClass != null && activityClass != null) {
+		// 	if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(),
+		// 			this.xfragmentClass.getType()))
+		// 		if (!Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), this.activityClass.getType()))
+		// 			return false;
+		// }
+		// if (v4fragmentClass != null && activityClass != null) {
+		// 	if (Scene.v().getOrMakeFastHierarchy().canStoreType(callbackHandler.getType(),
+		// 			this.v4fragmentClass.getType()))
+		// 		if (!Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), this.activityClass.getType()))
+		// 			return false;
+		// }
 
 		// If the callback handler is an inner class, we only accept it if its
 		// outer class matches the component
 		{
 			SootClass curHandler = callbackHandler;
+			Set<SootClass> visited = new HashSet<>();
 			while (curHandler.isInnerClass()) {
+				if(! visited.add(curHandler)) break;
 				SootClass outerClass = curHandler.getOuterClass();
 				if (components.contains(outerClass) && !Scene.v().getOrMakeFastHierarchy()
 						.canStoreType(component.getType(), outerClass.getType())) {
 					return false;
 				}
-
-				// Make sure that we don't loop infinitely, even if everything is weird
-				if (curHandler == outerClass)
-					break;
 				curHandler = outerClass;
 			}
 		}
