@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
@@ -386,7 +387,7 @@ public abstract class AbstractCallbackAnalyzer {
 			}
 		}
 
-		Set<SootClass> components = findDeclaringComponents(method);
+		Set<SootClass> components = findDeclaringComponents(method, false);
 		// Analyze all found callback classes
 		for (SootClass callbackClass : callbackClasses)
 			for(SootClass component: components)
@@ -443,7 +444,7 @@ public abstract class AbstractCallbackAnalyzer {
 
 		if(body == null) return;
 
-		Set<SootClass> components = findDeclaringComponents(method);
+		Set<SootClass> components = findDeclaringComponents(method, false);
 		for (Unit u : body.getUnits()) {
 			if (u instanceof ReturnStmt) {
 				ReturnStmt rs = (ReturnStmt) u;
@@ -487,7 +488,7 @@ public abstract class AbstractCallbackAnalyzer {
 			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,int,int)");
 			if(! isAddView) continue;
 			Value view = iExpr.getArg(0);
-			Set<SootClass> components = findDeclaringComponents(method);
+			Set<SootClass> components = findDeclaringComponents(method, false);
 			if(view instanceof Local) {
 				Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) view).possibleTypes();
 				if(possibleTypes.isEmpty()) {
@@ -660,7 +661,7 @@ public abstract class AbstractCallbackAnalyzer {
 						if (addFragment) {
 							// https://mailman.cs.mcgill.ca/pipermail/soot-list/2022-May/009310.html
 							// checkAndAddFragment(method.getDeclaringClass(), rt.getSootClass());
-							Set<SootClass> activities = findDeclaringActivities(method);
+							Set<SootClass> activities = findDeclaringComponents(method, true);
 							if(br instanceof ClassConstant)
 								for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
 							else if(br instanceof Local) {
@@ -699,7 +700,7 @@ public abstract class AbstractCallbackAnalyzer {
 				InvokeExpr invExpr = stmt.getInvokeExpr();
 				if (invExpr instanceof InstanceInvokeExpr) {
 					InstanceInvokeExpr iinvExpr = (InstanceInvokeExpr) invExpr;
-					Set<SootClass> activities = findDeclaringActivities(method);
+					Set<SootClass> activities = findDeclaringComponents(method, true);
 					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) iinvExpr.getBase()).possibleTypes();
 					if(possibleTypes.isEmpty()) {
 						for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) iinvExpr.getBase().getType()).getSootClass());
@@ -717,60 +718,71 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 	}
 
-	/*
-	 * Backward traverse in the call graph from method to find out the first connecting activity
-	 */
-	protected Set<SootClass> findDeclaringActivities(SootMethod method) {
-		Set<SootClass> activities = new HashSet<>();
-		Stack<SootMethod> stack = new Stack<>();
-		Set<String> visited = new HashSet<>();
-		stack.push(method);
-		while(! stack.isEmpty()) {
-			SootMethod topMtd = stack.pop();
-			if(! visited.add(topMtd.getSignature())) continue;
-			String topClsName = topMtd.getDeclaringClass().getName();
-			String topMtdName = topMtd.getName();
-			SootClass topMtdRtn = null;
-			Type rtnType = topMtd.getReturnType();
-			if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
-			if(topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null && this.activityNames.contains(topMtdRtn.getName())) activities.add(topMtdRtn);
-			else {
-				Iterator<Edge> edges = Scene.v().getCallGraph().edgesInto(topMtd);
-				while(edges.hasNext()) {
-					Edge edge = edges.next();
-					stack.push(edge.src());
-				}
-			}
+	private boolean outerClassNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
+		SootClass curCls = topCls;
+		Set<SootClass> visited = new HashSet<>();
+		while(curCls.isInnerClass()) {
+			if(! visited.add(curCls)) break;
+			SootClass outerClass = curCls.getOuterClass();
+			if(appComponents.contains(outerClass) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), outerClass.getType())) return true;
+			curCls = outerClass;
 		}
-		return activities;
+		return false;
 	}
 
 	/*
-	 * Backward traverse in the call graph from method to find out the first connecting component
+	 * Finding the components (only activities if onlyActivity is true) that directly connects to the method
 	 */
-	protected Set<SootClass> findDeclaringComponents(SootMethod method) {
-		Set<SootClass> components = new HashSet<>();
-		Stack<SootMethod> stack = new Stack<>();
-		Set<String> visited = new HashSet<>();
-		stack.push(method);
-		while(! stack.isEmpty()) {
-			SootMethod topMtd = stack.pop();
-			if(! visited.add(topMtd.getSignature())) continue;
-			String topClsName = topMtd.getDeclaringClass().getName();
-			String topMtdName = topMtd.getName();
-			SootClass topMtdRtn = null;
-			Type rtnType = topMtd.getReturnType();
-			if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
-			if(topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) components.add(topMtdRtn);
-			else {
-				Iterator<Edge> edges = Scene.v().getCallGraph().edgesInto(topMtd);
-				while(edges.hasNext()) {
-					Edge edge = edges.next();
-					stack.push(edge.src());
+	protected Set<SootClass> findDeclaringComponents(SootMethod method, boolean onlyActivity) {
+		Set<SootClass> rtnComponents = new HashSet<>();
+		Map<SootClass, SootMethod> components = new HashMap<>();
+		Set<SootClass> allComponents = new HashSet<>();
+		SootClass dummyMainCls = Scene.v().getSootClassUnsafe("dummyMainClass");
+		if(dummyMainCls == null) return new HashSet<>();
+		for(SootMethod mtd: dummyMainCls.getMethods()) {
+			if(mtd.getName().startsWith("dummyMainMethod_")) {
+				Type rtnType = mtd.getReturnType();
+				if(rtnType instanceof RefType) {
+					SootClass rtnCls = ((RefType) rtnType).getSootClass();
+					if(onlyActivity) {
+						if(this.activityNames.contains(rtnCls.getName())) components.put(rtnCls, mtd);
+					} else {
+						components.put(rtnCls, mtd);
+					}
+					allComponents.add(rtnCls);
 				}
 			}
 		}
-		return components;
+
+		for(Map.Entry<SootClass, SootMethod> entry: components.entrySet()) {
+			SootClass component = entry.getKey();
+			SootMethod dummyMainMtd = entry.getValue();
+			Stack<SootMethod> stack = new Stack<>();
+			Set<String> visited = new HashSet<>();
+			stack.push(dummyMainMtd);
+			while(! stack.isEmpty()) {
+				SootMethod top = stack.pop();
+				if(! visited.add(top.getSignature())) continue;
+				SootClass topCls = top.getDeclaringClass();
+				if(outerClassNotMatchesComponent(allComponents, component, topCls)) continue;
+				String topClsName = topCls.getName();
+				String topMtdName = top.getName();
+				SootClass topMtdRtn = null;
+				Type rtnType = top.getReturnType();
+				if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
+				if(! top.equals(dummyMainMtd) && topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) continue;
+				if(top.equals(method)) {
+					rtnComponents.add(component);
+					break;
+				}
+				Iterator<Edge> edges = Scene.v().getCallGraph().edgesOutOf(top);
+				while(edges.hasNext()) {
+					Edge edge = edges.next();
+					stack.push(edge.tgt());
+				}
+			}
+		}
+		return rtnComponents;
 	}
 
 	/**
@@ -807,7 +819,7 @@ public abstract class AbstractCallbackAnalyzer {
 
 		if(body == null) return;
 
-		Set<SootClass> activities = findDeclaringActivities(method);
+		Set<SootClass> activities = findDeclaringComponents(method, true);
 		for (Unit u : body.getUnits()) {
 			if (u instanceof ReturnStmt) {
 				ReturnStmt rs = (ReturnStmt) u;

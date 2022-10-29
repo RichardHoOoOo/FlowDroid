@@ -284,7 +284,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 							for (Value val : inv.getArgs()) {
 								Integer intValue = valueProvider.getValue(sm, stmt, val, Integer.class);
 								if (intValue != null) {
-									Set<SootClass> activities = findDeclaringActivities(sm);
+									Set<SootClass> activities = findDeclaringComponents(sm, true);
 									for(SootClass activity: activities)
 										this.layoutClasses.put(activity, intValue);
 								}
@@ -294,7 +294,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 						if (invokesInflate(inv)) {
 							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(0), Integer.class);
 							if (intValue != null) {
-								Set<SootClass> components = findDeclaringComponents(sm);
+								Set<SootClass> components = findDeclaringComponents(sm, false);
 								for(SootClass component: components) 
 									this.layoutClasses.put(component, intValue);
 							}
