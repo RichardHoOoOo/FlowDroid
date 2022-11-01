@@ -730,6 +730,11 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	private boolean classNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
+		if(appComponents.contains(topCls) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), topCls.getType())) return true;
+		return false;
+	}
+
 	private MultiMap<SootClass, String> compReachableMtds = new HashMultiMap<>();
 
 	protected void reConstructCompReachableMtds() {
@@ -759,6 +764,7 @@ public abstract class AbstractCallbackAnalyzer {
 				if(! visited.add(top.getSignature())) continue;
 				SootClass topCls = top.getDeclaringClass();
 				if(outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
+				if(classNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				String topClsName = topCls.getName();
 				String topMtdName = top.getName();
 				SootClass topMtdRtn = null;
