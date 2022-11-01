@@ -663,8 +663,9 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		return iccInstrumenter;
 	}
 
-	private void createADummyActivity() {
-		if(this.usedFragments == null || this.usedFragments.isEmpty()) return;
+	private SootClass createADummyActivity() {
+		if (config.getSootIntegrationMode() == SootIntegrationMode.UseExistingCallgraph) return null; // Do not create again because points-to analyis will be released if dummy activity is added again
+		if(this.usedFragments == null || this.usedFragments.isEmpty()) return null;
 		
 		SootClass dummyActivity = new SootClass("com.wTest.wTestDummyActivity", Modifier.PUBLIC);
 		dummyActivity.setSuperclass(Scene.v().getSootClass("android.app.Activity"));
@@ -680,11 +681,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		body.getUnits().add(Jimple.v().newIdentityStmt(thisLocal, Jimple.v().newThisRef(RefType.v("com.wTest.wTestDummyActivity"))));
 
 		this.entrypoints.add(dummyActivity);
-
-		for(String usedFragment: this.usedFragments) {
-			SootClass frag = Scene.v().getSootClassUnsafe(usedFragment);
-			if(frag != null) this.fragmentClasses.put(dummyActivity, frag);
-		}
+		return dummyActivity;
 	}
 
 	/**
@@ -725,6 +722,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		jimpleClass.addCallbackFilter(new UnreachableConstructorFilter());
 		jimpleClass.setActivityNames(this.activityNames);
 		jimpleClass.addAdditionalCallbacks(this.additionalCallbacks);
+		jimpleClass.setGlobalFragmentClasses(this.fragmentClasses);
 		jimpleClass.collectCallbackMethods();
 
 		// Find the user-defined sources in the layout XML files. This
@@ -742,7 +740,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		}
 
 		try {
-			createADummyActivity();
+			SootClass dummyActivity = createADummyActivity();
 			int depthIdx = 0;
 			boolean hasChanged = true;
 			boolean isInitial = true;
@@ -812,6 +810,15 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 				// Collect the XML-based callback methods
 				if (collectXmlBasedCallbackMethods(lfp, jimpleClass))
 					hasChanged = true;
+
+				if(dummyActivity != null) {
+					for(String usedFragment: this.usedFragments) {
+						SootClass frag = Scene.v().getSootClassUnsafe(usedFragment);
+						if(frag != null) {
+							if(this.fragmentClasses.put(dummyActivity, frag)) hasChanged = true;
+						}
+					}
+				}
 
 				for(SootClass entry: entrypoints) {
 					alienHostComponentFilter.addComponent(entry);
@@ -1035,7 +1042,6 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					Set<SootClass> fragments = lfp.getFragments().get(layoutFileName);
 					if (fragments != null) {
 						for (SootClass fragment : fragments) {
-							jimpleClass.addFragment(fragment);
 							if (fragmentClasses.put(callbackClass, fragment)) 
 								hasNewCallback = true;
 						}
@@ -1675,7 +1681,6 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 			createMainMethod(entrypoint);
 			constructCallgraphInternal();
 		}
-
 		// Create and run the data flow tracker
 		infoflow = createInfoflow();
 		infoflow.addResultsAvailableHandler(resultAggregator);

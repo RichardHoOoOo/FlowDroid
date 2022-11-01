@@ -1211,8 +1211,9 @@ public class SummaryTaintWrapper implements IReversibleTaintWrapper {
 
 		String fieldName = fieldSig.substring(fieldSig.lastIndexOf(" ") + 1);
 		fieldName = fieldName.substring(0, fieldName.length() - 1);
-
-		SootFieldRef ref = Scene.v().makeFieldRef(sc, fieldName, TypeUtils.getTypeFromString(type), false);
+		Type t = TypeUtils.getTypeFromString(type);
+		if(t == null) return null;
+		SootFieldRef ref = Scene.v().makeFieldRef(sc, fieldName, t, false);
 		return ref.resolve();
 	}
 

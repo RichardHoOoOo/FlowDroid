@@ -71,6 +71,8 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 
 	QueueReader<MethodOrMethodContext> reachableChangedListener;
 
+	private Set<SootClass> alreadyAnalyzeFragmentEntries = new HashSet<>();
+
 	/**
 	 * Collects the callback methods for all Android default handlers implemented in
 	 * the source code. Note that this operation runs inside Soot, so this method
@@ -91,6 +93,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 				// process?
 				if (callbackWorklist == null) {
 					logger.info("Collecting callbacks in DEFAULT mode...");
+					reConstructCompReachableMtds();
 					callbackWorklist = new HashMultiMap<>();
 
 					// Find the mappings between classes and layouts
@@ -116,6 +119,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 					reachableChangedListener = Scene.v().getReachableMethods().listener();
 					logger.info("Callback analysis done.");
 				} else {
+					reConstructCompReachableMtds();
 					// Find the mappings between classes and layouts
 					findClassLayoutMappings();
 
@@ -134,10 +138,17 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 					}
 
 					// Put fragments callbacks into the worklist since they are never included in the viewCallbacks if fragments does not contain xml callbacks or view callbacks
-					for(SootClass fragCls: fragments) {
-						List<MethodOrMethodContext> lcs = new ArrayList<MethodOrMethodContext>(entryPointUtils.getLifecycleMethods(fragCls));
-						for(MethodOrMethodContext lc: lcs) {
-							callbackWorklist.put(fragCls, lc.method());
+					for(SootClass activityCls: globalFragmentClasses.keySet()) {
+						for(SootClass fragCls: globalFragmentClasses.get(activityCls)) {
+							if(! alreadyAnalyzeFragmentEntries.add(fragCls)) continue;
+							List<MethodOrMethodContext> lcs = new ArrayList<MethodOrMethodContext>(entryPointUtils.getLifecycleMethods(fragCls));
+							if(! lcs.isEmpty()) {
+								for(MethodOrMethodContext lc: lcs) {
+									callbackWorklist.put(fragCls, lc.method());
+								}
+							} else {
+								callbackWorklist.put(fragCls, null); // In case no lifecycle callbacks are found in obfuscated app, we forcely add the fragment into the list
+							}
 						}
 					}
 
@@ -259,7 +270,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	 * Finds the mappings between classes and their respective layout files
 	 */
 	private void findClassLayoutMappings() {
-		//if (rmIterator == null)
+		// if (rmIterator == null)
 			rmIterator = Scene.v().getReachableMethods().listener();
 		while (rmIterator.hasNext()) {
 			SootMethod sm = rmIterator.next().method();

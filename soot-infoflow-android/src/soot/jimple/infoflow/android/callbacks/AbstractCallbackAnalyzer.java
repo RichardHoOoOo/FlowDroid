@@ -138,10 +138,10 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final Set<SootClass> dynamicManifestComponents = new HashSet<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClasses = new HashMultiMap<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClassesRev = new HashMultiMap<>();
-	protected final Set<SootClass> fragments = new HashSet<>();
+	protected MultiMap<SootClass, SootClass> globalFragmentClasses = new HashMultiMap<>(); // A reference to the fragmentClasses in SetupApplication
 
-	public void addFragment(SootClass fragmentClass) {
-		this.fragments.add(fragmentClass);
+	public void setGlobalFragmentClasses(MultiMap<SootClass, SootClass> globalFragmentClasses) {
+		this.globalFragmentClasses = globalFragmentClasses;
 	}
 
 	protected final List<ICallbackFilter> callbackFilters = new ArrayList<>();
@@ -730,26 +730,20 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
-	/*
-	 * Finding the components (only activities if onlyActivity is true) that directly connects to the method
-	 */
-	protected Set<SootClass> findDeclaringComponents(SootMethod method, boolean onlyActivity) {
-		Set<SootClass> rtnComponents = new HashSet<>();
+	private MultiMap<SootClass, String> compReachableMtds = new HashMultiMap<>();
+
+	protected void reConstructCompReachableMtds() {
+		this.compReachableMtds.clear();
+
 		Map<SootClass, SootMethod> components = new HashMap<>();
-		Set<SootClass> allComponents = new HashSet<>();
 		SootClass dummyMainCls = Scene.v().getSootClassUnsafe("dummyMainClass");
-		if(dummyMainCls == null) return new HashSet<>();
+		if(dummyMainCls == null) return;
 		for(SootMethod mtd: dummyMainCls.getMethods()) {
 			if(mtd.getName().startsWith("dummyMainMethod_")) {
 				Type rtnType = mtd.getReturnType();
 				if(rtnType instanceof RefType) {
 					SootClass rtnCls = ((RefType) rtnType).getSootClass();
-					if(onlyActivity) {
-						if(this.activityNames.contains(rtnCls.getName())) components.put(rtnCls, mtd);
-					} else {
-						components.put(rtnCls, mtd);
-					}
-					allComponents.add(rtnCls);
+					components.put(rtnCls, mtd);
 				}
 			}
 		}
@@ -764,23 +758,51 @@ public abstract class AbstractCallbackAnalyzer {
 				SootMethod top = stack.pop();
 				if(! visited.add(top.getSignature())) continue;
 				SootClass topCls = top.getDeclaringClass();
-				if(outerClassNotMatchesComponent(allComponents, component, topCls)) continue;
+				if(outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				String topClsName = topCls.getName();
 				String topMtdName = top.getName();
 				SootClass topMtdRtn = null;
 				Type rtnType = top.getReturnType();
 				if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
 				if(! top.equals(dummyMainMtd) && topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) continue;
-				if(top.equals(method)) {
-					rtnComponents.add(component);
-					break;
-				}
+				if(! top.equals(dummyMainMtd)) this.compReachableMtds.put(component, top.getSignature());
 				Iterator<Edge> edges = Scene.v().getCallGraph().edgesOutOf(top);
 				while(edges.hasNext()) {
 					Edge edge = edges.next();
 					stack.push(edge.tgt());
 				}
 			}
+		}
+	}
+
+	/*
+	 * Finding the components that directly connects to the method. Further find the activities that contains the result fragments if onlyActivity is set to true
+	 */
+	protected Set<SootClass> findDeclaringComponents(SootMethod method, boolean onlyActivity) {
+		Set<SootClass> rtnComponents = new HashSet<>();
+		for(SootClass component: this.compReachableMtds.keySet()) {
+			Set<String> reachableMtds = this.compReachableMtds.get(component);
+			if(reachableMtds.contains(method.getSignature())) rtnComponents.add(component);
+		}
+		if(onlyActivity) {
+			// For each fragment in the return components, find it container activity
+			Set<SootClass> activitiesContainingFrags = new HashSet<>();
+			Iterator<SootClass> itor = rtnComponents.iterator();
+			while(itor.hasNext()) {
+				SootClass rtnComp = itor.next();
+				if(! this.activityNames.contains(rtnComp.getName())) {
+					itor.remove();
+					for(SootClass activity: this.globalFragmentClasses.keySet()) {
+						for(SootClass frag: this.globalFragmentClasses.get(activity)) {
+							if(rtnComp.equals(frag)) {
+								activitiesContainingFrags.add(activity);
+								break;
+							}
+						}
+					}
+				}
+			}
+			rtnComponents.addAll(activitiesContainingFrags);
 		}
 		return rtnComponents;
 	}
@@ -1100,7 +1122,6 @@ public abstract class AbstractCallbackAnalyzer {
 	protected void checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
 		this.fragmentClasses.put(componentClass, fragmentClass);
 		this.fragmentClassesRev.put(fragmentClass, componentClass);
-		this.fragments.add(fragmentClass);
 	}
 
 	private boolean isEmpty(Body activeBody) {
