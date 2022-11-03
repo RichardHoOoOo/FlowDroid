@@ -339,9 +339,6 @@ public abstract class AbstractCallbackAnalyzer {
 								.isClassInSystemPackage(iinv.getMethod().getDeclaringClass().getName()))
 							continue;
 
-						// Apply some rules to check a listener must be registered by specific method calls
-						if(! matchCorrespondingRegisterMethod(iinv.getMethod(), (RefType) type)) continue;
-
 						// We have a formal parameter type that corresponds to one of the Android
 						// callback interfaces. Look for definitions of the parameter to estimate the
 						// actual type.
@@ -388,29 +385,11 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 
 		Set<SootClass> components = findDeclaringComponents(method, false);
+
 		// Analyze all found callback classes
 		for (SootClass callbackClass : callbackClasses)
 			for(SootClass component: components)
 				analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
-	}
-
-	/**
-	 * limit that the listener can only be registered by the registerMethod
-	 */
-	private boolean matchCorrespondingRegisterMethod(SootMethod registerMethod, RefType listenerType) {
-		String listenerTypeStr = listenerType.getSootClass().getName();
-		String registerMethodSig = registerMethod.getSignature();
-
-		if(listenerTypeStr.equals("android.support.v4.view.PagerAdapter") 
-		|| listenerTypeStr.equals("androidx.viewpager.widget.PagerAdapter")
-		|| listenerTypeStr.equals("androidx.recyclerview.widget.RecyclerView$Adapter")) {
-			if(registerMethodSig.equals("<androidx.viewpager.widget.ViewPager: void setAdapter(androidx.viewpager.widget.PagerAdapter)>") 
-			|| registerMethodSig.equals("<android.support.v4.view.ViewPager: void setAdapter(android.support.v4.view.PagerAdapter)>")
-			|| registerMethodSig.equals("<androidx.viewpager2.widget.ViewPager2: void setAdapter(androidx.recyclerview.widget.RecyclerView$Adapter)>")) return true;
-			else return false;
-		}
-
-		return true;
 	}
 
 	protected void analyzeMethodForAdapterViews(SootClass lifecycleElement, SootMethod method) {
@@ -1114,8 +1093,31 @@ public abstract class AbstractCallbackAnalyzer {
 		if (!filterAccepts(lifecycleClass, method))
 			return false;
 
-		return this.callbackMethods.put(lifecycleClass,
-				new AndroidCallbackDefinition(method, parentMethod, callbackType));
+		boolean rtn = this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(method, parentMethod, callbackType));
+		if((method.getModifiers() & soot.Modifier.SYNTHETIC) != 0) {
+			Body body = method.retrieveActiveBody();
+			if(body != null) {
+				for (Unit u : body.getUnits()) {
+					Stmt stmt = (Stmt) u;
+					if(! stmt.containsInvokeExpr()) continue;
+					InvokeExpr iExpr = stmt.getInvokeExpr();
+					SootMethod iMtd = iExpr.getMethod();
+					if(iMtd.getDeclaringClass().equals(method.getDeclaringClass()) && iMtd.getName().equals(method.getName()) && iMtd.getParameterCount() == method.getParameterCount() && ! iMtd.getReturnType().toString().equals(method.getReturnType().toString())) {
+						boolean allParaEquals = true;
+						for(int i=0; i<iMtd.getParameterCount(); i++) {
+							if(! iMtd.getParameterType(i).toString().equals(method.getParameterType(i).toString())) {
+								allParaEquals = false;
+								break;
+							}
+						}
+						// When 2 methods are declared in the same class and they have the same name and same parameters but different return types, we put iMtd into the call graph because soot seems cannot handle this type of synthetic method
+						if(allParaEquals) rtn |= this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(iMtd, parentMethod, callbackType));
+					}
+				}
+			}
+		}
+
+		return rtn;
 	}
 
 	/**
