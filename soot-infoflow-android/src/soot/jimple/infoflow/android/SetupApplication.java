@@ -166,6 +166,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		return this.appComponents;
 	}
 
+	protected String apkToolOutputPath;
+
+	public void setApkToolOutputPath(String apkToolOutputPath) {
+		this.apkToolOutputPath = apkToolOutputPath;
+	}
+
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -818,6 +824,14 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 							if(this.fragmentClasses.put(dummyActivity, frag)) hasChanged = true;
 						}
 					}
+ 					MultiMap<String, SootClass> lfpFrags = lfp.getFragments();
+ 					for(String layoutFile: lfpFrags.keySet()) {
+ 						for(SootClass frag: lfpFrags.get(layoutFile)) {
+ 							if(frag != null) {
+								if(this.fragmentClasses.put(dummyActivity, frag)) hasChanged = true;
+ 							}
+ 						}
+ 					}
 				}
 
 				for(SootClass entry: entrypoints) {

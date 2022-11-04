@@ -198,13 +198,12 @@ public class LayoutFileParser extends AbstractResourceParser {
 			@Override
 			public void handleResourceFile(final String fileName, Set<String> fileNameFilter, InputStream stream) {
 				// We only process valid layout XML files
-				if (!fileName.startsWith("res/layout") && !fileName.startsWith("res/navigation"))
-					return;
+				// if (!fileName.startsWith("res/layout") && !fileName.startsWith("res/navigation")) // So far we remove this check because of https://github.com/secure-software-engineering/FlowDroid/issues/539
+				// 	return;
 				if (!fileName.endsWith(".xml")) {
 					logger.warn(String.format("Skipping file %s in layout folder...", fileName));
 					return;
 				}
-
 				// Initialize the Soot classes
 				scViewGroup = Scene.v().getSootClassUnsafe("android.view.ViewGroup");
 				scView = Scene.v().getSootClassUnsafe("android.view.View");

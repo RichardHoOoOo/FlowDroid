@@ -12,10 +12,12 @@ package soot.jimple.infoflow.android.resources;
 
 import java.io.File;
 import java.io.InputStream;
+import java.io.FileInputStream;
 import java.util.Enumeration;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.Stack;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,32 @@ public abstract class AbstractResourceParser {
 			}
 		} catch (Exception e) {
 			logger.error("Error when looking for XML resource files in apk " + apk, e);
+			if (e instanceof RuntimeException)
+				throw (RuntimeException) e;
+			else
+				throw new RuntimeException(e);
+		}
+	}
+
+	protected void handleAndroidLayoutFiles(String apkToolOutputPath, Set<String> fileNameFilter, IResourceHandler handler) {
+		File resFolder = new File(apkToolOutputPath + "/res");
+		if (!resFolder.exists())
+			throw new RuntimeException("resource folder does not exist!");
+
+		try {
+			Stack<File> stack = new Stack<>();
+			stack.push(resFolder);
+			while(! stack.isEmpty()) {
+				File top = stack.pop();
+				if(top.isDirectory()) {
+					for(File element: top.listFiles()) stack.push(element);
+				} else {
+					InputStream is = new FileInputStream(top); // This is currently not correct because AXML parser requires the xml file to be binary
+					handler.handleResourceFile(top.getPath().substring(apkToolOutputPath.length()+1), fileNameFilter, is);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("Error when looking for XML resource files in the resource folder", e);
 			if (e instanceof RuntimeException)
 				throw (RuntimeException) e;
 			else
