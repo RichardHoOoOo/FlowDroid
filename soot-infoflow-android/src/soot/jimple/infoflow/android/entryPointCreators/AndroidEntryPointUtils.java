@@ -114,10 +114,6 @@ public class AndroidEntryPointUtils {
 			else if (osClassHostApduService != null
 					&& fh.canStoreType(currentClass.getType(), osClassHostApduService.getType()))
 				ctype = ComponentType.HostApduService;
-			// (a5) android.content.ServiceConnection
-			else if (osInterfaceServiceConnection != null
-					&& fh.canStoreType(currentClass.getType(), osInterfaceServiceConnection.getType()))
-				ctype = ComponentType.ServiceConnection;
 			// (a6) com.google.android.maps.MapActivity
 			else if (osClassMapActivity != null
 					&& fh.canStoreType(currentClass.getType(), osClassMapActivity.getType()))
@@ -143,6 +139,10 @@ public class AndroidEntryPointUtils {
 			else if (osClassContentProvider != null
 					&& fh.canStoreType(currentClass.getType(), osClassContentProvider.getType()))
 				ctype = ComponentType.ContentProvider;
+			// (a5) android.content.ServiceConnection (ServiceConnection is an interface, if an activity also implements it, put the branch in its original place may make an activity become a ServiceConnection)
+			else if (osInterfaceServiceConnection != null
+					&& fh.canStoreType(currentClass.getType(), osInterfaceServiceConnection.getType()))
+				ctype = ComponentType.ServiceConnection;
 		} else
 			logger.warn(String.format("No FastHierarchy, assuming %s is a plain class", currentClass.getName()));
 
