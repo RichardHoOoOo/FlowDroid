@@ -1093,3 +1093,4 @@ java.util.logging.SimpleFormatter
 java.util.logging.XMLFormatter
 com.google.android.material.slider.LabelFormatter
 java.lang.Runnable
+android.content.ServiceConnection

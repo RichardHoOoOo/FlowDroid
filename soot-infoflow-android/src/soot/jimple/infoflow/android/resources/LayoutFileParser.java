@@ -200,6 +200,8 @@ public class LayoutFileParser extends AbstractResourceParser {
 				// We only process valid layout XML files
 				// if (!fileName.startsWith("res/layout") && !fileName.startsWith("res/navigation")) // So far we remove this check because of https://github.com/secure-software-engineering/FlowDroid/issues/539
 				// 	return;
+				if(! fileName.startsWith("res/")) return;
+				
 				if (!fileName.endsWith(".xml")) {
 					logger.warn(String.format("Skipping file %s in layout folder...", fileName));
 					return;
@@ -230,7 +232,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 					AXmlHandler handler = new AXmlHandler(stream, new AXML20Parser());
 					parseLayoutNode(fileName, handler.getDocument().getRootNode());
 				} catch (Exception ex) {
-					logger.error("Could not read binary XML file: " + ex.getMessage(), ex);
+					logger.error("Could not read binary XML file " + fileName + ": " + ex.getMessage(), ex);
 				}
 			}
 		});

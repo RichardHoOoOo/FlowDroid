@@ -92,6 +92,10 @@ public abstract class AbstractCallbackAnalyzer {
 
 	protected final SootClass scContext = Scene.v().getSootClassUnsafe("android.content.Context");
 
+	protected final SootClass activityCls = Scene.v().getSootClassUnsafe("android.app.Activity");
+	protected final SootClass serviceCls = Scene.v().getSootClassUnsafe("android.app.Service");
+	protected final SootClass providerCls = Scene.v().getSootClassUnsafe("android.content.ContentProvider");
+
 	protected final SootClass scBroadcastReceiver = Scene.v()
 			.getSootClassUnsafe(AndroidEntryPointConstants.BROADCASTRECEIVERCLASS);
 	protected final SootClass scServiceConnection = Scene.v()
@@ -709,8 +713,30 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	private boolean isLegalInterCompCalls(SootClass comp1, SootClass comp2) {
+		boolean comp1IsActivity = activityCls != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), activityCls.getType());
+		boolean comp2IsActivity = activityCls != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), activityCls.getType());
+		boolean comp1IsService = serviceCls != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), serviceCls.getType());
+		boolean comp2IsService = serviceCls != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), serviceCls.getType());
+		boolean comp1IsReceiver = scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scBroadcastReceiver.getType());
+		boolean comp2IsReceiver = scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scBroadcastReceiver.getType());
+		boolean comp1IsProvider = providerCls != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), providerCls.getType());
+		boolean comp2IsProvider = providerCls != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), providerCls.getType());
+		boolean comp1IsFragment = scFragment != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scFragment.getType());
+		comp1IsFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scAndroidXFragment.getType());
+		comp1IsFragment |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scSupportFragment.getType());
+		boolean comp2IsFragment = scFragment != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scFragment.getType());
+		comp2IsFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scAndroidXFragment.getType());
+		comp2IsFragment |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scSupportFragment.getType());
+		if(comp1IsActivity && comp2IsService) return true;
+		return false;
+	}
+
 	private boolean classNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
-		if(appComponents.contains(topCls) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), topCls.getType())) return true;
+		if(appComponents.contains(topCls)) {
+			if(isLegalInterCompCalls(currComponent, topCls)) return false; // We allow calls between different components (e.g., activity call service method)
+			if(! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), topCls.getType())) return true;
+		}
 		return false;
 	}
 
