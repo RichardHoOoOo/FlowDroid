@@ -139,6 +139,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 	protected List<String> activityNames = null;
 
 	public void setActivityNames(List<String> activityNames) {
+		activityNames.add("com.wTest.wTestDummyActivity"); // Do not forget to add our dummy acitivty
 		this.activityNames = activityNames;
 	}
 

@@ -714,20 +714,20 @@ public abstract class AbstractCallbackAnalyzer {
 	}
 
 	private boolean isLegalInterCompCalls(SootClass comp1, SootClass comp2) {
-		boolean comp1IsActivity = activityCls != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), activityCls.getType());
-		boolean comp2IsActivity = activityCls != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), activityCls.getType());
-		boolean comp1IsService = serviceCls != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), serviceCls.getType());
-		boolean comp2IsService = serviceCls != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), serviceCls.getType());
-		boolean comp1IsReceiver = scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scBroadcastReceiver.getType());
-		boolean comp2IsReceiver = scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scBroadcastReceiver.getType());
-		boolean comp1IsProvider = providerCls != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), providerCls.getType());
-		boolean comp2IsProvider = providerCls != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), providerCls.getType());
-		boolean comp1IsFragment = scFragment != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scFragment.getType());
-		comp1IsFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scAndroidXFragment.getType());
-		comp1IsFragment |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(comp1.getType(), scSupportFragment.getType());
-		boolean comp2IsFragment = scFragment != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scFragment.getType());
-		comp2IsFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scAndroidXFragment.getType());
-		comp2IsFragment |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(comp2.getType(), scSupportFragment.getType());
+		boolean comp1IsActivity = activityCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), activityCls.getType());
+		boolean comp2IsActivity = activityCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), activityCls.getType());
+		boolean comp1IsService = serviceCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), serviceCls.getType());
+		boolean comp2IsService = serviceCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), serviceCls.getType());
+		boolean comp1IsReceiver = scBroadcastReceiver != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), scBroadcastReceiver.getType());
+		boolean comp2IsReceiver = scBroadcastReceiver != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), scBroadcastReceiver.getType());
+		boolean comp1IsProvider = providerCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), providerCls.getType());
+		boolean comp2IsProvider = providerCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), providerCls.getType());
+		boolean comp1IsFragment = scFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), scFragment.getType());
+		comp1IsFragment |= scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), scAndroidXFragment.getType());
+		comp1IsFragment |= scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp1.getType(), scSupportFragment.getType());
+		boolean comp2IsFragment = scFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), scFragment.getType());
+		comp2IsFragment |= scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), scAndroidXFragment.getType());
+		comp2IsFragment |= scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), scSupportFragment.getType());
 		if(comp1IsActivity && comp2IsService) return true;
 		return false;
 	}

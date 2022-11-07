@@ -203,7 +203,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 				if(! fileName.startsWith("res/")) return;
 				
 				if (!fileName.endsWith(".xml")) {
-					logger.warn(String.format("Skipping file %s in layout folder...", fileName));
+					// logger.warn(String.format("Skipping file %s in layout folder...", fileName));
 					return;
 				}
 				// Initialize the Soot classes
