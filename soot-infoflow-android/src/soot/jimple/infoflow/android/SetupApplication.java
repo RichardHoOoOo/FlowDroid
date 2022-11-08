@@ -86,6 +86,7 @@ import soot.util.HashMultiMap;
 import soot.util.MultiMap;
 import soot.jimple.JimpleBody;
 import soot.jimple.Jimple;
+import soot.jimple.infoflow.handlers.ICallGraphHandler;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.File;
@@ -171,6 +172,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 	public void setApkToolOutputPath(String apkToolOutputPath) {
 		this.apkToolOutputPath = apkToolOutputPath;
+	}
+
+	protected ICallGraphHandler cgHandler;
+
+	public void setCallGraphHandler(ICallGraphHandler cgHandler) {
+		this.cgHandler = cgHandler;
 	}
 
 	/**
@@ -872,6 +879,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 				// rounds
 				if (config.getSootIntegrationMode() == SootIntegrationMode.UseExistingCallgraph)
 					break;
+
+				if(hasChanged == false) {
+					if(this.cgHandler != null) {
+						// Stub, see if augument call graph here is necessary
+					}
+				}
 			}
 		} catch (Exception ex) {
 			logger.error("Could not calculate callback methods", ex);

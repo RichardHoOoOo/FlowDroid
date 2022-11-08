@@ -73,6 +73,10 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 
 	private Set<SootClass> alreadyAnalyzeFragmentEntries = new HashSet<>();
 
+	public void setCallbackWorklist(MultiMap<SootClass, SootMethod> callbackWorklist) {
+		this.callbackWorklist = callbackWorklist;
+	}
+
 	/**
 	 * Collects the callback methods for all Android default handlers implemented in
 	 * the source code. Note that this operation runs inside Soot, so this method

@@ -159,6 +159,8 @@ public abstract class AbstractCallbackAnalyzer {
 		this.activityNames = activityNames;
 	}
 
+	public abstract void setCallbackWorklist(MultiMap<SootClass, SootMethod> callbackWorklist);
+
 	protected LoadingCache<SootField, List<Type>> arrayToContentTypes = CacheBuilder.newBuilder()
 			.build(new CacheLoader<SootField, List<Type>>() {
 

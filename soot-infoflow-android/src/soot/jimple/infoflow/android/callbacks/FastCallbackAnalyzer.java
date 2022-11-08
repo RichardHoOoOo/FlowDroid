@@ -11,6 +11,7 @@ import soot.Value;
 import soot.jimple.InvokeExpr;
 import soot.jimple.Stmt;
 import soot.jimple.infoflow.android.InfoflowAndroidConfiguration;
+import soot.util.MultiMap;
 
 /**
  * A callback analyzer that favors performance over precision.
@@ -33,6 +34,10 @@ public class FastCallbackAnalyzer extends AbstractCallbackAnalyzer {
 	public FastCallbackAnalyzer(InfoflowAndroidConfiguration config, Set<SootClass> entryPointClasses,
 			Set<String> androidCallbacks) throws IOException {
 		super(config, entryPointClasses, androidCallbacks);
+	}
+
+	public void setCallbackWorklist(MultiMap<SootClass, SootMethod> callbackWorklist) {
+		// Empty body
 	}
 
 	@Override
