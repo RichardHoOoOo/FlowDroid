@@ -326,9 +326,10 @@ public abstract class AbstractCallbackAnalyzer {
 		Set<SootClass> callbackClasses = new HashSet<SootClass>();
 		for (Unit u : method.retrieveActiveBody().getUnits()) {
 			Stmt stmt = (Stmt) u;
-			// Callback registrations are always instance invoke expressions
-			if (stmt.containsInvokeExpr() && stmt.getInvokeExpr() instanceof InstanceInvokeExpr) {
-				InstanceInvokeExpr iinv = (InstanceInvokeExpr) stmt.getInvokeExpr();
+			// Callback registrations may not necessarily be instance invoke expressions
+			// E.g., staticinvoke <kotlinx.coroutines.BuildersKt: kotlinx.coroutines.Job launch$default(kotlinx.coroutines.CoroutineScope,kotlin.coroutines.CoroutineContext,int,kotlin.jvm.functions.Function2,int,java.lang.Object)>
+			if (stmt.containsInvokeExpr()) {
+				InvokeExpr iinv = stmt.getInvokeExpr();
 
 				final SootMethodRef mref = iinv.getMethodRef();
 				for (int i = 0; i < iinv.getArgCount(); i++) {
@@ -338,7 +339,6 @@ public abstract class AbstractCallbackAnalyzer {
 					String param = type.toString();
 					if (androidCallbacks.contains(param)) {
 						Value arg = iinv.getArg(i);
-
 						// This call must be to a system API in order to
 						// register an OS-level callback
 						if (!SystemClassHandler.v()
@@ -360,7 +360,6 @@ public abstract class AbstractCallbackAnalyzer {
 									logger.warn("Unsupported type detected in callback analysis");
 									continue;
 								}
-
 								SootClass targetClass = baseType.getSootClass();
 								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName()))
 									callbackClasses.add(targetClass);

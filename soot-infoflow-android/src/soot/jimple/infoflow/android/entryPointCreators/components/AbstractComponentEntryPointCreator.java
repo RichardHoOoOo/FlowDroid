@@ -34,6 +34,7 @@ import soot.jimple.Stmt;
 import soot.jimple.infoflow.android.entryPointCreators.AbstractAndroidEntryPointCreator;
 import soot.jimple.infoflow.android.manifest.IManifestHandler;
 import soot.jimple.infoflow.entryPointCreators.SimulatedCodeElementTag;
+import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointUtils.ComponentType;
 import soot.jimple.toolkits.scalar.NopEliminator;
 import soot.util.HashMultiMap;
 import soot.util.MultiMap;
@@ -418,6 +419,12 @@ public abstract class AbstractComponentEntryPointCreator extends AbstractAndroid
 			// Parse the callback
 			if (!callbackSignature.isEmpty() && !callbackSignature.equals(theMethod.getSubSignature()))
 				continue;
+
+			if(! (this instanceof ServiceConnectionEntryPointCreator) && entryPointUtils.getComponentType(theMethod.getDeclaringClass()) == ComponentType.ServiceConnection) {
+				// It is ok to call service connection callbacks from component that is not a service connection
+				callbackClasses.put(theMethod.getDeclaringClass(), theMethod);
+				continue;
+			}
 
 			// Check that we don't have one of the lifecycle methods as they are
 			// treated separately.

@@ -1891,7 +1891,6 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 						callbackMethodSigs.put(sc, cd.getTargetMethod());
 			}
 		}
-
 		entryPointCreator.setCallbackFunctions(callbackMethodSigs);
 		entryPointCreator.setFragments(fragmentClasses);
 		entryPointCreator.setComponents(components);
