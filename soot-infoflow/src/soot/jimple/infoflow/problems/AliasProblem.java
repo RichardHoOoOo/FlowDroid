@@ -42,6 +42,7 @@ import soot.jimple.InstanceOfExpr;
 import soot.jimple.InvokeExpr;
 import soot.jimple.LengthExpr;
 import soot.jimple.NewArrayExpr;
+import soot.jimple.NewExpr;
 import soot.jimple.ReturnStmt;
 import soot.jimple.StaticFieldRef;
 import soot.jimple.Stmt;

@@ -133,6 +133,8 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final SootClass resourceCursorTreeAdapter = Scene.v().getSootClassUnsafe("android.widget.ResourceCursorTreeAdapter");
 	protected final SootClass cursorAdapter = Scene.v().getSootClassUnsafe("android.widget.CursorAdapter");
 
+	protected final SootClass OnBackPressedCallback = Scene.v().getSootClassUnsafe("androidx.activity.OnBackPressedCallback");
+
 	protected final InfoflowAndroidConfiguration config;
 	protected final Set<SootClass> entryPointClasses;
 	protected final Set<String> androidCallbacks;
@@ -702,13 +704,25 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 	}
 
+	private boolean isComponent(SootClass cls) {
+		// return appComponents.contains(cls);
+		boolean isComponent = activityCls != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), activityCls.getType());
+		isComponent |= serviceCls != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), serviceCls.getType());
+		isComponent |= scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scBroadcastReceiver.getType());
+		isComponent |= providerCls != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), providerCls.getType());
+		isComponent |= scFragment != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scFragment.getType());
+		isComponent |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scAndroidXFragment.getType());
+		isComponent |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scSupportFragment.getType());
+		return isComponent;
+	}
+
 	private boolean outerClassNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
 		SootClass curCls = topCls;
 		Set<SootClass> visited = new HashSet<>();
 		while(curCls.isInnerClass()) {
 			if(! visited.add(curCls)) break;
 			SootClass outerClass = curCls.getOuterClass();
-			if(appComponents.contains(outerClass) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), outerClass.getType())) return true;
+			if(isComponent(outerClass) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), outerClass.getType())) return true;
 			curCls = outerClass;
 		}
 		return false;
@@ -734,10 +748,39 @@ public abstract class AbstractCallbackAnalyzer {
 	}
 
 	private boolean classNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
-		if(appComponents.contains(topCls)) {
+		if(isComponent(topCls)) {
 			if(isLegalInterCompCalls(currComponent, topCls)) return false; // We allow calls between different components (e.g., activity call service method)
 			if(! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), topCls.getType())) return true;
 		}
+		return false;
+	}
+
+	private boolean isBackMethod(SootMethod mtd) {
+		if(SystemClassHandler.v().isClassInSystemPackage(mtd.getDeclaringClass().getName())) return false;
+		String subSig = mtd.getSubSignature();
+		if(activityCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(mtd.getDeclaringClass().getType(), activityCls.getType())) {
+			if(subSig.equals("void onBackPressed()")) return true;
+			if(subSig.equals("void onSaveInstanceState(android.os.Bundle)")) return true;
+			if(subSig.equals("void onPause()")) return true;
+			if(subSig.equals("void onStop()")) return true;
+			if(subSig.equals("void onDestroy()")) return true;
+		}
+		if(serviceCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(mtd.getDeclaringClass().getType(), serviceCls.getType())) {
+			if(subSig.equals("boolean onUnbind(android.content.Intent)")) return true;
+			if(subSig.equals("void onDestroy()")) return true;
+		}
+		if((scFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(mtd.getDeclaringClass().getType(), scFragment.getType()))
+		|| (scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(mtd.getDeclaringClass().getType(), scAndroidXFragment.getType()))
+		|| (scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(mtd.getDeclaringClass().getType(), scSupportFragment.getType()))) {
+			if(subSig.equals("void onPause()")) return true;
+			if(subSig.equals("void onStop()")) return true;
+			if(subSig.equals("void onDestroyView()")) return true;
+			if(subSig.equals("void onDestroy()")) return true;
+			if(subSig.equals("void onDetach()")) return true;
+			if(subSig.equals("void onSaveInstanceState(android.os.Bundle)")) return true;
+		}
+		if(OnBackPressedCallback != null && Scene.v().getOrMakeFastHierarchy().canStoreType(mtd.getDeclaringClass().getType(), OnBackPressedCallback.getType()) && mtd.getSubSignature().equals("void handleOnBackPressed()")) return true;
+		
 		return false;
 	}
 
@@ -771,6 +814,7 @@ public abstract class AbstractCallbackAnalyzer {
 				SootClass topCls = top.getDeclaringClass();
 				if(outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				if(classNotMatchesComponent(components.keySet(), component, topCls)) continue;
+				// if(isBackMethod(top)) continue;
 				String topClsName = topCls.getName();
 				String topMtdName = top.getName();
 				SootClass topMtdRtn = null;
