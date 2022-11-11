@@ -332,7 +332,6 @@ public abstract class AbstractCallbackAnalyzer {
 			// E.g., staticinvoke <kotlinx.coroutines.BuildersKt: kotlinx.coroutines.Job launch$default(kotlinx.coroutines.CoroutineScope,kotlin.coroutines.CoroutineContext,int,kotlin.jvm.functions.Function2,int,java.lang.Object)>
 			if (stmt.containsInvokeExpr()) {
 				InvokeExpr iinv = stmt.getInvokeExpr();
-
 				final SootMethodRef mref = iinv.getMethodRef();
 				for (int i = 0; i < iinv.getArgCount(); i++) {
 					final Type type = mref.getParameterType(i);
@@ -363,8 +362,7 @@ public abstract class AbstractCallbackAnalyzer {
 									continue;
 								}
 								SootClass targetClass = baseType.getSootClass();
-								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName()))
-									callbackClasses.add(targetClass);
+								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName())) callbackClasses.add(targetClass);
 							}
 
 							// If we don't have pointsTo information, we take
@@ -392,7 +390,6 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 
 		Set<SootClass> components = findDeclaringComponents(method, false);
-
 		// Analyze all found callback classes
 		for (SootClass callbackClass : callbackClasses)
 			for(SootClass component: components)
