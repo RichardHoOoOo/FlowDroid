@@ -310,6 +310,12 @@ public abstract class AbstractCallbackAnalyzer {
 			filter.reset();
 	}
 
+	private boolean matchSpecialCallbackParaRule(SootMethod mtd, int paraIndex) {
+		if(mtd.getSignature().equals("<androidx.compose.runtime.internal.ComposableLambdaKt: androidx.compose.runtime.internal.ComposableLambda composableLambdaInstance(int,boolean,java.lang.Object)>") && paraIndex == 2) return true;
+		if(mtd.getSignature().equals("<androidx.compose.runtime.internal.ComposableLambdaKt: androidx.compose.runtime.internal.ComposableLambda composableLambda(androidx.compose.runtime.Composer,int,boolean,java.lang.Object)>") && paraIndex == 3) return true;
+		return false;
+	}
+
 	/**
 	 * Analyzes the given method and looks for callback registrations
 	 *
@@ -338,7 +344,7 @@ public abstract class AbstractCallbackAnalyzer {
 					if (!(type instanceof RefType))
 						continue;
 					String param = type.toString();
-					if (androidCallbacks.contains(param)) {
+					if (androidCallbacks.contains(param) || matchSpecialCallbackParaRule(iinv.getMethod(), i)) {
 						Value arg = iinv.getArg(i);
 						// This call must be to a system API in order to
 						// register an OS-level callback
@@ -703,13 +709,13 @@ public abstract class AbstractCallbackAnalyzer {
 
 	private boolean isComponent(SootClass cls) {
 		// return appComponents.contains(cls);
-		boolean isComponent = activityCls != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), activityCls.getType());
-		isComponent |= serviceCls != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), serviceCls.getType());
-		isComponent |= scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scBroadcastReceiver.getType());
-		isComponent |= providerCls != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), providerCls.getType());
-		isComponent |= scFragment != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scFragment.getType());
-		isComponent |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scAndroidXFragment.getType());
-		isComponent |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(cls.getType(), scSupportFragment.getType());
+		boolean isComponent = activityCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), activityCls.getType());
+		isComponent |= serviceCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), serviceCls.getType());
+		isComponent |= scBroadcastReceiver != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scBroadcastReceiver.getType());
+		isComponent |= providerCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), providerCls.getType());
+		isComponent |= scFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scFragment.getType());
+		isComponent |= scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scAndroidXFragment.getType());
+		isComponent |= scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scSupportFragment.getType());
 		return isComponent;
 	}
 
@@ -822,6 +828,8 @@ public abstract class AbstractCallbackAnalyzer {
 				Iterator<Edge> edges = Scene.v().getCallGraph().edgesOutOf(top);
 				while(edges.hasNext()) {
 					Edge edge = edges.next();
+					SootClass tgtCls = edge.tgt().getDeclaringClass();
+					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
 					stack.push(edge.tgt());
 				}
 			}
