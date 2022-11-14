@@ -287,15 +287,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 					Stmt stmt = (Stmt) u;
 					if (stmt.containsInvokeExpr()) {
 						InvokeExpr inv = stmt.getInvokeExpr();
-						if (invokesSetContentView(inv)) { // check
-															// also
-															// for
-															// inflate
-															// to
-															// look
-															// for
-															// the
-															// fragments
+						if (invokesSetContentView(inv) || invokesNewXActivity(inv)) {
 							for (Value val : inv.getArgs()) {
 								Integer intValue = valueProvider.getValue(sm, stmt, val, Integer.class);
 								if (intValue != null) {
