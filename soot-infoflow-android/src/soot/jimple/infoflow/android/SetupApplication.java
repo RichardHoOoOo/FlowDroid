@@ -87,6 +87,8 @@ import soot.util.MultiMap;
 import soot.jimple.JimpleBody;
 import soot.jimple.Jimple;
 import soot.jimple.infoflow.handlers.ICallGraphHandler;
+import soot.jimple.toolkits.callgraph.CallGraph;
+import soot.jimple.toolkits.callgraph.Edge;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.File;
@@ -698,6 +700,21 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		return dummyActivity;
 	}
 
+	public static void printCallGraph() {
+		System.out.println("Printing call graph");
+		CallGraph cg = Scene.v().getCallGraph();
+		Iterator<Edge> edges = cg.iterator();
+		int i = 0;
+		while(edges.hasNext()) {
+			Edge edge = edges.next();
+			if(edge == null || edge.src() == null) continue;
+			SootClass srcCls = edge.src().getDeclaringClass();
+			if(! srcCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(srcCls.getName())) continue;
+			System.out.println(++i + ": " + edge.src().getSignature() + " ==> " + edge.tgt().getSignature());
+			System.out.println("at " + edge.srcUnit());
+		}
+	}
+
 	/**
 	 * Calculates the set of callback methods declared in the XML resource files or
 	 * the app's source code
@@ -794,7 +811,6 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 				// Run the soot-based operations
 				constructCallgraphInternal();
-
 				if (!Scene.v().hasCallGraph())
 					throw new RuntimeException("No callgraph in Scene even after creating one. That's very sad "
 							+ "and should never happen.");

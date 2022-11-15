@@ -660,9 +660,6 @@ public abstract class AbstractCallbackAnalyzer {
 								} else {
 									for(Type possibleType: possibleTypes) {
 										if(possibleType instanceof RefType) {
-if(method.getDeclaringClass().getName().equals("com.boardgamegeek.ui.SimpleSinglePaneActivity") && method.getName().equals("createFragment")) {
-	System.out.println("ppp1: " + ((RefType) possibleType).getSootClass());
-}
 											for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
 										} else if (possibleType instanceof AnySubType) {
 											for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
