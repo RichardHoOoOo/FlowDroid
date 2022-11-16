@@ -125,6 +125,7 @@ public abstract class AbstractCallbackAnalyzer {
 			.getSootClassUnsafe("androidx.viewpager2.adapter.FragmentStateAdapter");
 
 	protected final SootClass viewGroup = Scene.v().getSootClassUnsafe("android.view.ViewGroup");
+	protected final SootClass scViewClass = Scene.v().getSootClassUnsafe("android.view.View");
 
 	protected final SootClass adapter = Scene.v().getSootClassUnsafe("android.widget.Adapter");
 	protected final SootClass expandableListAdapter = Scene.v().getSootClassUnsafe("android.widget.ExpandableListAdapter");
@@ -415,19 +416,20 @@ public abstract class AbstractCallbackAnalyzer {
 		extendsAdapter |= cursorAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), cursorAdapter.getType());
 
 		if(! extendsAdapter) return;
+		String subsubSig = method.getSubSignature().split(" ")[1];
+		boolean isGetView = subsubSig.equals("getView(int,android.view.View,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("getChildView(int,int,boolean,android.view.View,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("getGroupView(int,boolean,android.view.View,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("getDropDownView(int,android.view.View,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("newChildView(boolean,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("newGroupView(boolean,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("newChildView(android.content.Context,android.database.Cursor,boolean,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("newGroupView(android.content.Context,android.database.Cursor,boolean,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("newDropDownView(android.content.Context,android.database.Cursor,android.view.ViewGroup)");
+		isGetView |= subsubSig.equals("newView(android.content.Context,android.database.Cursor,android.view.ViewGroup)");
 
-		boolean isGetView = method.getSubSignature().equals("android.view.View getView(int,android.view.View,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View getChildView(int,int,boolean,android.view.View,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View getGroupView(int,boolean,android.view.View,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View getDropDownView(int,android.view.View,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View newChildView(boolean,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View newGroupView(boolean,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View newChildView(android.content.Context,android.database.Cursor,boolean,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View newGroupView(android.content.Context,android.database.Cursor,boolean,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View newDropDownView(android.content.Context,android.database.Cursor,android.view.ViewGroup)");
-		isGetView |= method.getSubSignature().equals("android.view.View newView(android.content.Context,android.database.Cursor,android.view.ViewGroup)");
-
-		if(! isGetView) return;
+		boolean rtnView = scViewClass != null && Scene.v().getFastHierarchy().canStoreType(method.getReturnType(), scViewClass.getType());
+		if(! isGetView || ! rtnView) return;
 
 		Body body = method.retrieveActiveBody();
 
@@ -891,12 +893,13 @@ public abstract class AbstractCallbackAnalyzer {
 
 		if(! extendsAdapter) return;
 
-		boolean isGetItem = method.getSubSignature().equals("android.support.v4.app.Fragment getItem(int)");
-		isGetItem |= method.getSubSignature().equals("androidx.fragment.app.Fragment getItem(int)");
+		if(! method.getName().equals("getItem") && ! method.getName().equals("createFragment")) return;
+		if(method.getParameterCount() != 1) return;
+		if(! method.getParameterType(0).toString().equals("int")) return;
+		boolean rtnFrag = scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(method.getReturnType(), scSupportFragment.getType());
+		rtnFrag |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(method.getReturnType(), scAndroidXFragment.getType());
 
-		boolean isCreateFragment = method.getSubSignature().equals("androidx.fragment.app.Fragment createFragment(int)");
-
-		if(! isGetItem && ! isCreateFragment) return;
+		if(! rtnFrag) return;
 
 		Body body = method.retrieveActiveBody();
 

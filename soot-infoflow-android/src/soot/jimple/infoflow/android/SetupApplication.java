@@ -132,6 +132,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 	protected SootClass scView = null;
 
 	protected IInstruHandler instruHandler;
+	protected IInstruHandler cgInstruHandler;
 	protected Set<PreAnalysisHandler> preprocessors = new HashSet<>();
 	protected Set<ResultsAvailableHandler> resultsAvailableHandlers = new HashSet<>();
 	protected TaintPropagationHandler taintPropagationHandler = null;
@@ -651,6 +652,11 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		// Construct the actual callgraph
 		logger.info("Constructing the callgraph...");
 		PackManager.v().getPack("cg").apply();
+
+		if(this.cgInstruHandler != null) {
+			cgInstruHandler.onBeforeInstru();
+			cgInstruHandler.onAfterInstru();
+		}
 
 		// ICC instrumentation
 		if (iccInstrumenter != null)
@@ -2011,6 +2017,10 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 	public void setInstruHandler(IInstruHandler instruHandler) {
 		this.instruHandler = instruHandler;
+	}
+
+	public void setCallGraphInstruHandler(IInstruHandler cgInstruHandler) {
+		this.cgInstruHandler = cgInstruHandler;
 	}
 
 	/**
