@@ -164,6 +164,29 @@ public abstract class AbstractCallbackAnalyzer {
 
 	public abstract void setCallbackWorklist(MultiMap<SootClass, SootMethod> callbackWorklist);
 
+	private Map<SootClass, MultiMap<String, SootClass>> callbackToBaseMap = new HashMap<>();
+
+	public void addIntoCallbackToBaseMap(SootClass component, SootMethod callback, SootClass baseCls) {
+		boolean cbDeclareInCompCls = activityCls != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), activityCls.getType());
+		cbDeclareInCompCls |= serviceCls != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), serviceCls.getType());
+		cbDeclareInCompCls |= providerCls != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), providerCls.getType());
+		cbDeclareInCompCls |= scBroadcastReceiver != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), scBroadcastReceiver.getType());
+		cbDeclareInCompCls |= scFragment != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), scFragment.getType());
+		cbDeclareInCompCls |= scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), scSupportFragment.getType());
+		cbDeclareInCompCls |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(callback.getDeclaringClass().getType(), scAndroidXFragment.getType());
+		if(cbDeclareInCompCls) return;
+		MultiMap<String, SootClass> cbToBase = callbackToBaseMap.get(component);
+		if(cbToBase == null) {
+			cbToBase = new HashMultiMap<>();
+			callbackToBaseMap.put(component, cbToBase);
+		}
+		cbToBase.put(callback.getSignature(), baseCls);
+	}
+
+	public Map<SootClass, MultiMap<String, SootClass>> getCallbackToBaseMap() {
+		return callbackToBaseMap;
+	}
+
 	protected LoadingCache<SootField, List<Type>> arrayToContentTypes = CacheBuilder.newBuilder()
 			.build(new CacheLoader<SootField, List<Type>>() {
 
@@ -532,6 +555,7 @@ public abstract class AbstractCallbackAnalyzer {
 				if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isPrivate()) {
 					SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
 					if (parentMethod != null) {
+						addIntoCallbackToBaseMap(callbackClass, sm, viewClass);
 						this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
 						systemMethods.remove(sm.getSubSignature());
 					}
@@ -1058,7 +1082,7 @@ public abstract class AbstractCallbackAnalyzer {
 					// Check whether this is a real callback method
 					SootMethod parentMethod = systemMethods.get(method.getSubSignature());
 					if (parentMethod != null) {
-						if (checkAndAddMethod(method, parentMethod, sootClass, CallbackType.Default)) {
+						if (checkAndAddMethod(method, parentMethod, sootClass, CallbackType.Default, sootClass)) {
 							//We only keep the latest override in the class hierarchy
 							systemMethods.remove(parentMethod.getSubSignature());
 						}
@@ -1127,7 +1151,7 @@ public abstract class AbstractCallbackAnalyzer {
 			for (SootMethod sm : sc.getMethods()) {
 				SootMethod callbackImplementation = getMethodFromHierarchyEx(baseClass, sm.getSubSignature());
 				if (callbackImplementation != null)
-					checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType);
+					checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType, baseClass);
 			}
 		}
 	}
@@ -1158,8 +1182,7 @@ public abstract class AbstractCallbackAnalyzer {
 	 * @return True if the method is new, i.e., has not been seen before, otherwise
 	 *         false
 	 */
-	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass,
-			CallbackType callbackType) {
+	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass, CallbackType callbackType, SootClass baseCls) {
 		// Do not call system methods
 		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName()))
 			return false;
@@ -1178,7 +1201,10 @@ public abstract class AbstractCallbackAnalyzer {
 		if (!filterAccepts(lifecycleClass, method))
 			return false;
 
-		boolean rtn = this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(method, parentMethod, callbackType));
+		boolean rtn = false;
+
+		addIntoCallbackToBaseMap(lifecycleClass, method, baseCls);
+		if(this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(method, parentMethod, callbackType))) rtn = true;
 		if((method.getModifiers() & soot.Modifier.SYNTHETIC) != 0) {
 			Body body = method.retrieveActiveBody();
 			if(body != null) {
@@ -1196,7 +1222,10 @@ public abstract class AbstractCallbackAnalyzer {
 							}
 						}
 						// When 2 methods are declared in the same class and they have the same name and same parameters but different return types, we put iMtd into the call graph because soot seems cannot handle this type of synthetic method
-						if(allParaEquals) rtn |= this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(iMtd, parentMethod, callbackType));
+						if(allParaEquals) {
+							addIntoCallbackToBaseMap(lifecycleClass, iMtd, baseCls);
+							if(this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(iMtd, parentMethod, callbackType))) rtn = true;
+						}
 					}
 				}
 			}

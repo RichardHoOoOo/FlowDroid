@@ -243,10 +243,9 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	}
 
 	@Override
-	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass,
-			CallbackType callbackType) {
+	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass, CallbackType callbackType, SootClass baseCls) {
 		if (!this.excludedEntryPoints.contains(lifecycleClass)) {
-			if (super.checkAndAddMethod(method, parentMethod, lifecycleClass, callbackType)) {
+			if (super.checkAndAddMethod(method, parentMethod, lifecycleClass, callbackType, baseCls)) {
 				// Has this entry point been excluded?
 				this.callbackWorklist.put(lifecycleClass, method);
 				return true;

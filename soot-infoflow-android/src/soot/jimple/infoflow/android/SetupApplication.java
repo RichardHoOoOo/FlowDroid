@@ -721,6 +721,8 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		}
 	}
 
+	public static Map<SootClass, MultiMap<String, SootClass>> callbackToBaseMap;
+
 	/**
 	 * Calculates the set of callback methods declared in the XML resource files or
 	 * the app's source code
@@ -761,6 +763,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		jimpleClass.addAdditionalCallbacks(this.additionalCallbacks);
 		jimpleClass.setGlobalFragmentClasses(this.fragmentClasses);
 		jimpleClass.collectCallbackMethods();
+		callbackToBaseMap = jimpleClass.getCallbackToBaseMap();
 
 		// Find the user-defined sources in the layout XML files. This
 		// only needs to be done once, but is a Soot phase.
@@ -1103,7 +1106,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					if (controls != null) {
 						for (AndroidLayoutControl lc : controls) {
 							if (!SystemClassHandler.v().isClassInSystemPackage(lc.getViewClass().getName()))
-								hasNewCallback |= registerCallbackMethodsForView(callbackClass, lc);
+								if(registerCallbackMethodsForView(callbackClass, lc, jimpleClass)) hasNewCallback = true;
 						}
 					}
 				} else
@@ -1185,7 +1188,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 	 *                      with the given class
 	 * @return
 	 */
-	private boolean registerCallbackMethodsForView(SootClass callbackClass, AndroidLayoutControl lc) {
+	private boolean registerCallbackMethodsForView(SootClass callbackClass, AndroidLayoutControl lc, AbstractCallbackAnalyzer jimpleClass) {
 		// Ignore system classes
 		if (SystemClassHandler.v().isClassInSystemPackage(callbackClass.getName()))
 			return false;
@@ -1237,8 +1240,8 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					SootMethod parentMethod = systemMethods.get(sm.getSubSignature());
 					if (parentMethod != null) {
 						// This is a real callback method
-						changed |= this.callbackMethods.put(callbackClass,
-								new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+						jimpleClass.addIntoCallbackToBaseMap(callbackClass, sm, sc);
+						if(this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget))) changed = true;
 						systemMethods.remove(sm.getSubSignature());
 					}
 				}

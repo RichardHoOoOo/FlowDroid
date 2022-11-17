@@ -38,6 +38,7 @@ import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointUtils.Co
 import soot.jimple.toolkits.scalar.NopEliminator;
 import soot.util.HashMultiMap;
 import soot.util.MultiMap;
+import soot.jimple.infoflow.android.SetupApplication;
 
 /**
  * Class for generating a dummy main method that represents the lifecycle of a
@@ -415,6 +416,13 @@ public abstract class AbstractComponentEntryPointCreator extends AbstractAndroid
 	 */
 	private MultiMap<SootClass, SootMethod> getCallbackMethods(String callbackSignature) {
 		MultiMap<SootClass, SootMethod> callbackClasses = new HashMultiMap<>();
+		
+
+		// We try to extract the top classes that are not the children of any other classes and let them as the based to call callback methods.
+		// We do this because we found FlowDroid create different base locals to invoke callbacks even if two locals' classes has inheritance relations.
+
+		MultiMap<String, SootClass> cbToBaseCls = SetupApplication.callbackToBaseMap.get(component);
+
 		for (SootMethod theMethod : this.callbacks) {
 			// Parse the callback
 			if (!callbackSignature.isEmpty() && !callbackSignature.equals(theMethod.getSubSignature()))
@@ -422,7 +430,9 @@ public abstract class AbstractComponentEntryPointCreator extends AbstractAndroid
 
 			if(! (this instanceof ServiceConnectionEntryPointCreator) && entryPointUtils.getComponentType(theMethod.getDeclaringClass()) == ComponentType.ServiceConnection) {
 				// It is ok to call service connection callbacks from component that is not a service connection
-				callbackClasses.put(theMethod.getDeclaringClass(), theMethod);
+				if(cbToBaseCls != null && cbToBaseCls.containsKey(theMethod.getSignature())) {
+					for(SootClass baseCls: cbToBaseCls.get(theMethod.getSignature())) callbackClasses.put(baseCls, theMethod);
+				} else callbackClasses.put(theMethod.getDeclaringClass(), theMethod);
 				continue;
 			}
 
@@ -431,7 +441,9 @@ public abstract class AbstractComponentEntryPointCreator extends AbstractAndroid
 			if (entryPointUtils.isEntryPointMethod(theMethod))
 				continue;
 
-			callbackClasses.put(theMethod.getDeclaringClass(), theMethod);
+			if(cbToBaseCls != null && cbToBaseCls.containsKey(theMethod.getSignature())) {
+				for(SootClass baseCls: cbToBaseCls.get(theMethod.getSignature())) callbackClasses.put(baseCls, theMethod);
+			} else callbackClasses.put(theMethod.getDeclaringClass(), theMethod);
 		}
 		return callbackClasses;
 	}
