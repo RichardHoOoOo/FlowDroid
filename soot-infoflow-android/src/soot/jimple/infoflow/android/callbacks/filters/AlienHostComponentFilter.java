@@ -110,8 +110,9 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 				}
 
 				// Do we have a usable constructor?
-				if (!isConstructorUsable)
+				if (!isConstructorUsable) {
 					return false;
+				}
 			}
 		}
 

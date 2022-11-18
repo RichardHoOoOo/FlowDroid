@@ -76,6 +76,9 @@ import soot.toolkits.graph.ExceptionalUnitGraphFactory;
 import soot.toolkits.scalar.SimpleLocalDefs;
 import soot.util.HashMultiMap;
 import soot.util.MultiMap;
+import soot.jimple.infoflow.android.callbacks.filters.UnreachableConstructorFilter;
+import soot.jimple.infoflow.android.callbacks.filters.ApplicationCallbackFilter;
+import soot.jimple.infoflow.android.callbacks.filters.AlienHostComponentFilter;
 
 import java.util.Stack;
 
@@ -375,7 +378,6 @@ public abstract class AbstractCallbackAnalyzer {
 						if (!SystemClassHandler.v()
 								.isClassInSystemPackage(iinv.getMethod().getDeclaringClass().getName()))
 							continue;
-
 						// We have a formal parameter type that corresponds to one of the Android
 						// callback interfaces. Look for definitions of the parameter to estimate the
 						// actual type.
@@ -576,7 +578,7 @@ public abstract class AbstractCallbackAnalyzer {
 	 *         otherwise false
 	 */
 	private boolean filterAccepts(SootClass lifecycleElement, SootClass targetClass) {
-		for (ICallbackFilter filter : callbackFilters)
+		for (ICallbackFilter filter : callbackFilters) 
 			if (!filter.accepts(lifecycleElement, targetClass))
 				return false;
 		return true;
@@ -842,7 +844,7 @@ public abstract class AbstractCallbackAnalyzer {
 				if(! visited.add(top.getSignature())) continue;
 				SootClass topCls = top.getDeclaringClass();
 				if(outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
-				if(classNotMatchesComponent(components.keySet(), component, topCls)) continue;
+				if(! top.isStatic() && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				// if(isBackMethod(top)) continue;
 				String topClsName = topCls.getName();
 				String topMtdName = top.getName();
@@ -913,7 +915,6 @@ public abstract class AbstractCallbackAnalyzer {
 		extendsAdapter |= scFragmentPagerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scFragmentPagerAdapter.getType());
 		extendsAdapter |= scAndroidXFragmentPagerAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scAndroidXFragmentPagerAdapter.getType());
 		extendsAdapter |= scAndroidXFragmentStateAdapter != null && Scene.v().getFastHierarchy().canStoreType(method.getDeclaringClass().getType(), scAndroidXFragmentStateAdapter.getType());
-
 
 		if(! extendsAdapter) return;
 
@@ -1202,7 +1203,6 @@ public abstract class AbstractCallbackAnalyzer {
 			return false;
 
 		boolean rtn = false;
-
 		addIntoCallbackToBaseMap(lifecycleClass, method, baseCls);
 		if(this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(method, parentMethod, callbackType))) rtn = true;
 		if((method.getModifiers() & soot.Modifier.SYNTHETIC) != 0) {
@@ -1242,6 +1242,8 @@ public abstract class AbstractCallbackAnalyzer {
 	 * @param fragmentClass  The fragment class
 	 */
 	protected void checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
+		if(! fragmentClass.isConcrete()) return;
+		if(SystemClassHandler.v().isClassInSystemPackage(fragmentClass.getName())) return;
 		this.fragmentClasses.put(componentClass, fragmentClass);
 		this.fragmentClassesRev.put(fragmentClass, componentClass);
 	}
