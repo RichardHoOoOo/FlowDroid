@@ -159,7 +159,6 @@ public class LayoutFileParser extends AbstractResourceParser {
 		if(! visited.add(layoutFile)) return;
 		layoutFile = layoutFile.replace("/layout-large/", "/layout/");
 		fragments.put(layoutFile, fragment);
-
 		// Recursively process any dependencies we might have collected before
 		// we have processed the target
 		if (includeDependencies.containsKey(layoutFile))
@@ -264,7 +263,8 @@ public class LayoutFileParser extends AbstractResourceParser {
 			// do not consider any attributes of this elements, just
 			// continue with the children
 		} else if (tname.equals("fragment") || tname.equals("dialog") || tname.equals("androidx.fragment.app.FragmentContainerView")) {
-			final AXmlAttribute<?> attr = rootNode.getAttribute("name");
+			AXmlAttribute<?> attr = rootNode.getAttribute("name");
+			if(attr == null) attr = rootNode.getAttribute("class");
 			// final AXmlAttribute<?> attrID = rootNode.getAttribute("id");
 			if (attr == null)
 				logger.warn("Fragment without class name or id detected");
