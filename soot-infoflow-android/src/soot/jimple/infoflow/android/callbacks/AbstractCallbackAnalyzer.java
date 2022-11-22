@@ -837,14 +837,16 @@ public abstract class AbstractCallbackAnalyzer {
 			SootClass component = entry.getKey();
 			SootMethod dummyMainMtd = entry.getValue();
 			Stack<SootMethod> stack = new Stack<>();
+			Stack<Boolean> isSingleOutEdgeStack = new Stack<>();
 			Set<String> visited = new HashSet<>();
 			stack.push(dummyMainMtd);
+			isSingleOutEdgeStack.push(true);
 			while(! stack.isEmpty()) {
 				SootMethod top = stack.pop();
-				if(! visited.add(top.getSignature())) continue;
+				boolean isSingleOutEdge = isSingleOutEdgeStack.pop();
 				SootClass topCls = top.getDeclaringClass();
 				if(outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
-				if(! top.isStatic() && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
+				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				// if(isBackMethod(top)) continue;
 				String topClsName = topCls.getName();
 				String topMtdName = top.getName();
@@ -852,13 +854,21 @@ public abstract class AbstractCallbackAnalyzer {
 				Type rtnType = top.getReturnType();
 				if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
 				if(! top.equals(dummyMainMtd) && topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) continue;
+				if(! visited.add(top.getSignature())) continue;
 				if(! top.equals(dummyMainMtd)) this.compReachableMtds.put(component, top.getSignature());
 				Iterator<Edge> edges = Scene.v().getCallGraph().edgesOutOf(top);
 				while(edges.hasNext()) {
 					Edge edge = edges.next();
 					SootClass tgtCls = edge.tgt().getDeclaringClass();
 					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
+					int count = 0;
+					Iterator<Edge> itor = Scene.v().getCallGraph().edgesOutOf(edge.srcUnit());
+					while(itor.hasNext()) {
+						if(itor.next().tgt().getName().equals(edge.tgt().getName())) count++;
+					}
 					stack.push(edge.tgt());
+					if(count == 1) isSingleOutEdgeStack.push(true);
+					else isSingleOutEdgeStack.push(false);
 				}
 			}
 		}
