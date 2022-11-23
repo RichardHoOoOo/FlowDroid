@@ -340,6 +340,10 @@ public abstract class AbstractCallbackAnalyzer {
 	private boolean matchSpecialCallbackParaRule(SootMethod mtd, int paraIndex) {
 		if(mtd.getSignature().equals("<androidx.compose.runtime.internal.ComposableLambdaKt: androidx.compose.runtime.internal.ComposableLambda composableLambdaInstance(int,boolean,java.lang.Object)>") && paraIndex == 2) return true;
 		if(mtd.getSignature().equals("<androidx.compose.runtime.internal.ComposableLambdaKt: androidx.compose.runtime.internal.ComposableLambda composableLambda(androidx.compose.runtime.Composer,int,boolean,java.lang.Object)>") && paraIndex == 3) return true;
+		if(mtd.getSignature().equals("<android.text.Spannable: void setSpan(java.lang.Object,int,int,int)>") && paraIndex == 0) return true;
+		if(mtd.getSignature().equals("<android.text.PrecomputedText: void setSpan(java.lang.Object,int,int,int)>") && paraIndex == 0) return true;
+		if(mtd.getSignature().equals("<android.text.SpannableString: void setSpan(java.lang.Object,int,int,int)>") && paraIndex == 0) return true;
+		if(mtd.getSignature().equals("<android.text.SpannableStringBuilder: void setSpan(java.lang.Object,int,int,int)>") && paraIndex == 0) return true;
 		return false;
 	}
 
@@ -862,9 +866,11 @@ public abstract class AbstractCallbackAnalyzer {
 					SootClass tgtCls = edge.tgt().getDeclaringClass();
 					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
 					int count = 0;
-					Iterator<Edge> itor = Scene.v().getCallGraph().edgesOutOf(edge.srcUnit());
-					while(itor.hasNext()) {
-						if(itor.next().tgt().getName().equals(edge.tgt().getName())) count++;
+					if(edge.srcUnit() != null) {
+						Iterator<Edge> itor = Scene.v().getCallGraph().edgesOutOf(edge.srcUnit());
+						while(itor.hasNext()) {
+							if(itor.next().tgt().getName().equals(edge.tgt().getName())) count++;
+						}
 					}
 					stack.push(edge.tgt());
 					if(count == 1) isSingleOutEdgeStack.push(true);
