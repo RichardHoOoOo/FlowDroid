@@ -17,6 +17,7 @@ import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 import soot.*;
 import soot.jimple.Stmt;
+import soot.jimple.InstanceInvokeExpr;
 import soot.jimple.infoflow.*;
 import soot.jimple.infoflow.InfoflowConfiguration.SootIntegrationMode;
 import soot.jimple.infoflow.android.InfoflowAndroidConfiguration.CallbackConfiguration;
@@ -652,7 +653,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		// Construct the actual callgraph
 		logger.info("Constructing the callgraph...");
 		PackManager.v().getPack("cg").apply();
-
+		
 		if(this.cgInstruHandler != null) {
 			cgInstruHandler.onBeforeInstru();
 			cgInstruHandler.onAfterInstru();
