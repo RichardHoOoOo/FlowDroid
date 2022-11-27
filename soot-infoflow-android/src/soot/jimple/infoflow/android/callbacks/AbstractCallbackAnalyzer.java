@@ -860,11 +860,41 @@ public abstract class AbstractCallbackAnalyzer {
 				if(! top.equals(dummyMainMtd) && topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) continue;
 				if(! visited.add(top.getSignature())) continue;
 				if(! top.equals(dummyMainMtd)) this.compReachableMtds.put(component, top.getSignature());
+
+				List<Pair<Unit, List<SootMethod>>> allowedCalleeAtUnitPairs = new ArrayList<>();
+				List<Unit> units = new ArrayList<>();
 				Iterator<Edge> edges = Scene.v().getCallGraph().edgesOutOf(top);
+				while(edges.hasNext()) {
+					Edge edge = edges.next();
+					Unit unit = edge.srcUnit();
+					if(units.contains(unit)) continue;
+					units.add(unit);
+					Stmt stmt = (Stmt) unit;
+					if(stmt.containsInvokeExpr()) {
+						SootMethod iMtd = stmt.getInvokeExpr().getMethod();
+						if(iMtd.isConstructor() || iMtd.isStatic() || iMtd.isStaticInitializer()) continue;
+						Pair<Unit, List<SootMethod>> pair = allowedCalleeAtUnit(component, iMtd, unit);
+						if(pair != null) allowedCalleeAtUnitPairs.add(pair);
+					}
+				}
+
+				edges = Scene.v().getCallGraph().edgesOutOf(top);
 				while(edges.hasNext()) {
 					Edge edge = edges.next();
 					SootClass tgtCls = edge.tgt().getDeclaringClass();
 					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
+					
+					boolean notAllowedAtUnit = false;
+					if(edge.srcStmt().containsInvokeExpr() && edge.srcStmt().getInvokeExpr().getMethod().getName().equals(edge.tgt().getName())) {
+						for(Pair<Unit, List<SootMethod>> pair: allowedCalleeAtUnitPairs) {
+							if(pair.getO1().equals(edge.srcStmt()) && ! pair.getO2().contains(edge.tgt())) {
+								notAllowedAtUnit = true;
+								break;
+							}
+						}
+					}
+					if(notAllowedAtUnit) continue;
+			
 					int count = 0;
 					if(edge.srcUnit() != null) {
 						Iterator<Edge> itor = Scene.v().getCallGraph().edgesOutOf(edge.srcUnit());
@@ -878,6 +908,38 @@ public abstract class AbstractCallbackAnalyzer {
 				}
 			}
 		}
+	}
+
+	/*
+	 * When the possible methods invoked from currComp at a callsite contains method declared in the component (including child classes) or its inner classes, other methods invoked 
+	 * at the callsite are likely to be FPs
+	 */
+	private Pair<Unit, List<SootMethod>> allowedCalleeAtUnit(SootClass currComp, SootMethod iMtd, Unit callsite) {
+		Iterator<Edge> itor = Scene.v().getCallGraph().edgesOutOf(callsite);
+		List<SootMethod> allowedCallees = new ArrayList<>();
+		while(itor.hasNext()) {
+			Edge edge = itor.next();
+			if(edge.tgt().getName().equals(iMtd.getName())) {
+				SootClass cls = edge.tgt().getDeclaringClass();
+				if(! SystemClassHandler.v().isClassInSystemPackage(cls.getName()) && isComponent(cls) && Scene.v().getOrMakeFastHierarchy().canStoreType(currComp.getType(), cls.getType())) {
+					allowedCallees.add(edge.tgt());
+					continue;
+				}
+				SootClass curCls = cls;
+				Set<SootClass> visited = new HashSet<>();
+				while(curCls.isInnerClass()) {
+					if(! visited.add(curCls)) break;
+					SootClass outerClass = curCls.getOuterClass();
+					if(! SystemClassHandler.v().isClassInSystemPackage(outerClass.getName()) && isComponent(outerClass) && Scene.v().getOrMakeFastHierarchy().canStoreType(currComp.getType(), outerClass.getType())) {
+						allowedCallees.add(edge.tgt());
+						break;
+					}
+					curCls = outerClass;
+				}
+			}
+		}
+		if(allowedCallees.isEmpty()) return null;
+		return new Pair<>(callsite, allowedCallees);
 	}
 
 	/*
