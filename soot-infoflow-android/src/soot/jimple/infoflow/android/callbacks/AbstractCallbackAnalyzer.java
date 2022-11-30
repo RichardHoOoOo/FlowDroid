@@ -867,6 +867,7 @@ public abstract class AbstractCallbackAnalyzer {
 				while(edges.hasNext()) {
 					Edge edge = edges.next();
 					Unit unit = edge.srcUnit();
+					if(unit == null) continue;
 					if(units.contains(unit)) continue;
 					units.add(unit);
 					Stmt stmt = (Stmt) unit;
@@ -885,7 +886,7 @@ public abstract class AbstractCallbackAnalyzer {
 					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
 					
 					boolean notAllowedAtUnit = false;
-					if(edge.srcStmt().containsInvokeExpr() && edge.srcStmt().getInvokeExpr().getMethod().getName().equals(edge.tgt().getName())) {
+					if(edge.srcStmt() != null && edge.srcStmt().containsInvokeExpr() && edge.srcStmt().getInvokeExpr().getMethod().getName().equals(edge.tgt().getName())) {
 						for(Pair<Unit, List<SootMethod>> pair: allowedCalleeAtUnitPairs) {
 							if(pair.getO1().equals(edge.srcStmt()) && ! pair.getO2().contains(edge.tgt())) {
 								notAllowedAtUnit = true;
