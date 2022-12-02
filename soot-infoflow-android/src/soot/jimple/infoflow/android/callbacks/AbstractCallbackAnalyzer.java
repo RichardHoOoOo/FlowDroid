@@ -1146,10 +1146,12 @@ public abstract class AbstractCallbackAnalyzer {
 		// Android OS class, we treat it as a potential callback.
 		Map<String, SootMethod> systemMethods = new HashMap<>(10000);
 		for (SootClass parentClass : Scene.v().getActiveHierarchy().getSuperclassesOf(sootClass)) {
-			if (SystemClassHandler.v().isClassInSystemPackage(parentClass.getName()))
-				for (SootMethod sm : parentClass.getMethods())
+			if (SystemClassHandler.v().isClassInSystemPackage(parentClass.getName())) {
+				for (SootMethod sm : parentClass.getMethods()) {
 					if (!sm.isConstructor() && !sm.isStatic() && !sm.isStaticInitializer() && !sm.isFinal() && !sm.isPrivate())
 						systemMethods.put(sm.getSubSignature(), sm);
+				}
+			}
 		}
 
 		// Iterate over all user-implemented methods. If they are inherited
