@@ -79,6 +79,7 @@ import soot.util.MultiMap;
 import soot.jimple.infoflow.android.callbacks.filters.UnreachableConstructorFilter;
 import soot.jimple.infoflow.android.callbacks.filters.ApplicationCallbackFilter;
 import soot.jimple.infoflow.android.callbacks.filters.AlienHostComponentFilter;
+import soot.jimple.NewExpr;
 
 import java.util.Stack;
 
@@ -427,9 +428,11 @@ public abstract class AbstractCallbackAnalyzer {
 
 		Set<SootClass> components = findDeclaringComponents(method, false);
 		// Analyze all found callback classes
-		for (SootClass callbackClass : callbackClasses)
-			for(SootClass component: components)
-				analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
+		for (SootClass callbackClass : callbackClasses) {
+			for(SootClass component: components) { // Check if the callback type can be initialized in methods that are reachable from the component, if not, the type resolved by pointsTo analysis may be a FP
+				if(isReachableObj(component, callbackClass)) analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
+			}
+		}
 	}
 
 	protected void analyzeMethodForAdapterViews(SootClass lifecycleElement, SootMethod method) {
@@ -476,7 +479,9 @@ public abstract class AbstractCallbackAnalyzer {
 					} else {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
-								for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+								for(SootClass component: components) {
+									if(isReachableObj(component, ((RefType) possibleType).getSootClass())) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+								}
 							} else if (possibleType instanceof AnySubType) {
 								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass());
 							}
@@ -517,8 +522,11 @@ public abstract class AbstractCallbackAnalyzer {
 				} else {
 					for(Type possibleType: possibleTypes) {
 						if(possibleType instanceof RefType) {
-							if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) possibleType).getSootClass().getName()))
-								for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+							if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) possibleType).getSootClass().getName())) {
+								for(SootClass component: components) {
+									if(isReachableObj(component, ((RefType) possibleType).getSootClass())) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+								}
+							}
 						} else if (possibleType instanceof AnySubType) {
 							if (!SystemClassHandler.v().isClassInSystemPackage(((AnySubType) possibleType).getBase().getSootClass().getName()))
 								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass());
@@ -692,7 +700,9 @@ public abstract class AbstractCallbackAnalyzer {
 								} else {
 									for(Type possibleType: possibleTypes) {
 										if(possibleType instanceof RefType) {
-											for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+											for(SootClass activity: activities) {
+												if(isReachableObj(activity, ((RefType) possibleType).getSootClass())) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+											}
 										} else if (possibleType instanceof AnySubType) {
 											for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
 										}
@@ -728,7 +738,9 @@ public abstract class AbstractCallbackAnalyzer {
 					} else {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
-								for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+								for(SootClass activity: activities) {
+									if(isReachableObj(activity, ((RefType) possibleType).getSootClass())) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+								}
 							} else if (possibleType instanceof AnySubType) {
 								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
 							}
@@ -819,10 +831,12 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
-	private MultiMap<SootClass, String> compReachableMtds = new HashMultiMap<>();
+	private MultiMap<SootClass, String> compReachableMtds = new HashMultiMap<>(); // Each entry represents the set of reachable method from a component
+	private MultiMap<SootClass, SootClass> compReachableObjs = new HashMultiMap<>(); // Each entry represents the set of class whose instance initialization is reachable from a component
 
 	protected void reConstructCompReachableMtds() {
 		this.compReachableMtds.clear();
+		this.compReachableObjs.clear();
 
 		Map<SootClass, SootMethod> components = new HashMap<>();
 		SootClass dummyMainCls = Scene.v().getSootClassUnsafe("dummyMainClass");
@@ -860,6 +874,19 @@ public abstract class AbstractCallbackAnalyzer {
 				if(! top.equals(dummyMainMtd) && topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) continue;
 				if(! visited.add(top.getSignature())) continue;
 				if(! top.equals(dummyMainMtd)) this.compReachableMtds.put(component, top.getSignature());
+				if(top.isConcrete() && ! topClsName.equals("dummyMainClass") && ! top.hasTag(SimulatedCodeElementTag.TAG_NAME)) {
+					// Scan the method units to find object that are initialized and put its class into compReachableObjs
+					Body body = top.retrieveActiveBody();
+					if(body != null) {
+						for(Unit u: body.getUnits()) {
+							if(! (u instanceof AssignStmt)) continue;
+							AssignStmt aStmt = (AssignStmt) u;
+							if(! (aStmt.getRightOp() instanceof NewExpr)) continue;
+							NewExpr nExpr = (NewExpr) aStmt.getRightOp();
+							this.compReachableObjs.put(component, nExpr.getBaseType().getSootClass());
+						}
+					}
+				}
 
 				List<Pair<Unit, List<SootMethod>>> allowedCalleeAtUnitPairs = new ArrayList<>();
 				List<Unit> units = new ArrayList<>();
@@ -909,6 +936,11 @@ public abstract class AbstractCallbackAnalyzer {
 				}
 			}
 		}
+	}
+
+	private boolean isReachableObj(SootClass comp, SootClass obj) {
+		Set<SootClass> reachableObjs = this.compReachableObjs.get(comp);
+		return reachableObjs.contains(obj);
 	}
 
 	/*
@@ -1021,7 +1053,9 @@ public abstract class AbstractCallbackAnalyzer {
 					} else {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
-								for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+								for(SootClass activity: activities) {
+									if(isReachableObj(activity, ((RefType) possibleType).getSootClass())) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+								}
 							} else if (possibleType instanceof AnySubType) {
 								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
 							}
