@@ -701,7 +701,14 @@ public abstract class AbstractCallbackAnalyzer {
 									for(Type possibleType: possibleTypes) {
 										if(possibleType instanceof RefType) {
 											for(SootClass activity: activities) {
-												if(isReachableObj(activity, ((RefType) possibleType).getSootClass())) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+												Set<SootClass> frags = this.globalFragmentClasses.get(activity);
+												boolean objReachable = isReachableObj(activity, ((RefType) possibleType).getSootClass());
+												if(frags != null) {
+													for(SootClass frag: frags) {
+														objReachable |= isReachableObj(frag, ((RefType) possibleType).getSootClass());
+													}
+												}
+												if(objReachable) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
 											}
 										} else if (possibleType instanceof AnySubType) {
 											for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
@@ -739,7 +746,14 @@ public abstract class AbstractCallbackAnalyzer {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
 								for(SootClass activity: activities) {
-									if(isReachableObj(activity, ((RefType) possibleType).getSootClass())) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+									Set<SootClass> frags = this.globalFragmentClasses.get(activity);
+									boolean objReachable = isReachableObj(activity, ((RefType) possibleType).getSootClass());
+									if(frags != null) {
+										for(SootClass frag: frags) {
+											objReachable |= isReachableObj(frag, ((RefType) possibleType).getSootClass());
+										}
+									}
+									if(objReachable) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
 								}
 							} else if (possibleType instanceof AnySubType) {
 								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
@@ -863,7 +877,7 @@ public abstract class AbstractCallbackAnalyzer {
 				SootMethod top = stack.pop();
 				boolean isSingleOutEdge = isSingleOutEdgeStack.pop();
 				SootClass topCls = top.getDeclaringClass();
-				if(outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
+				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				// if(isBackMethod(top)) continue;
 				String topClsName = topCls.getName();
@@ -1054,7 +1068,14 @@ public abstract class AbstractCallbackAnalyzer {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
 								for(SootClass activity: activities) {
-									if(isReachableObj(activity, ((RefType) possibleType).getSootClass())) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+									Set<SootClass> frags = this.globalFragmentClasses.get(activity);
+									boolean objReachable = isReachableObj(activity, ((RefType) possibleType).getSootClass());
+									if(frags != null) {
+										for(SootClass frag: frags) {
+											objReachable |= isReachableObj(frag, ((RefType) possibleType).getSootClass());
+										}
+									}
+									if(objReachable) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
 								}
 							} else if (possibleType instanceof AnySubType) {
 								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
