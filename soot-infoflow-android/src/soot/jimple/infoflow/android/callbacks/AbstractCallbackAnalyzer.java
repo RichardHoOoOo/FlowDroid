@@ -873,6 +873,7 @@ public abstract class AbstractCallbackAnalyzer {
 			Set<String> visited = new HashSet<>();
 			stack.push(dummyMainMtd);
 			isSingleOutEdgeStack.push(true);
+			this.compReachableObjs.put(component, component); // Each component can new its self
 			while(! stack.isEmpty()) {
 				SootMethod top = stack.pop();
 				boolean isSingleOutEdge = isSingleOutEdgeStack.pop();
