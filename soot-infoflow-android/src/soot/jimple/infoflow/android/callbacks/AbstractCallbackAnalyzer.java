@@ -816,6 +816,16 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	private boolean syntheticClassNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
+		if(! topCls.isInnerClass() && ((topCls.getModifiers() & soot.Modifier.SYNTHETIC) != 0) && topCls.getName().contains("$")) {
+			// Class whose name contains "$$" may not be an inner class. E.g., ml.docilealligator.infinityforreddit.activities.MainActivity$$ExternalSyntheticLambda17
+			String prefix = topCls.getName().split("\\$")[0];
+			SootClass prefixCls = Scene.v().getSootClassUnsafe(prefix);
+			if(prefixCls != null && isComponent(prefixCls) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), prefixCls.getType())) return true;
+		}
+		return false;
+	}
+
 	private boolean isBackMethod(SootMethod mtd) {
 		if(SystemClassHandler.v().isClassInSystemPackage(mtd.getDeclaringClass().getName())) return false;
 		String subSig = mtd.getSubSignature();
@@ -880,6 +890,7 @@ public abstract class AbstractCallbackAnalyzer {
 				SootClass topCls = top.getDeclaringClass();
 				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
+				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && syntheticClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
 				// if(isBackMethod(top)) continue;
 				String topClsName = topCls.getName();
 				String topMtdName = top.getName();
@@ -983,6 +994,15 @@ public abstract class AbstractCallbackAnalyzer {
 						break;
 					}
 					curCls = outerClass;
+				}
+
+				if(! cls.isInnerClass() && ((cls.getModifiers() & soot.Modifier.SYNTHETIC) != 0) && cls.getName().contains("$")) {
+					// Class whose name contains "$$" may not be an inner class. E.g., ml.docilealligator.infinityforreddit.activities.MainActivity$$ExternalSyntheticLambda17
+					String prefix = cls.getName().split("\\$")[0];
+					SootClass prefixCls = Scene.v().getSootClassUnsafe(prefix);
+					if(prefixCls != null && ! SystemClassHandler.v().isClassInSystemPackage(prefix) && isComponent(prefixCls) && Scene.v().getOrMakeFastHierarchy().canStoreType(currComp.getType(), prefixCls.getType())) {
+						allowedCallees.add(edge.tgt());
+					}
 				}
 			}
 		}
