@@ -164,6 +164,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 	public void setUsedFragments(Set<String> usedFragments) {
 		this.usedFragments = usedFragments;
+		for(String usedFragment: usedFragments) System.out.println("Used fragment: " + usedFragment);
 	}
 
 	protected Set<SootClass> appComponents = new HashSet<>(); // this set includes activities, services, receivers, providers, and fragments

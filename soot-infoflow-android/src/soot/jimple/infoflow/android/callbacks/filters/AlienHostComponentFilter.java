@@ -75,6 +75,10 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 			Set<SootClass> visited = new HashSet<>();
 			while (curHandler.isInnerClass()) {
 				if(! visited.add(curHandler)) break;
+				// In cases like a fragment is an inner class of an activity, if we do not have the following check, 
+				// the outer classes will finally become the activity, which is not the child of the inner fragment.
+				// false will be returned
+				if(Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), curHandler.getType())) break;
 				SootClass outerClass = curHandler.getOuterClass();
 				if (components.contains(outerClass) && !Scene.v().getOrMakeFastHierarchy()
 						.canStoreType(component.getType(), outerClass.getType())) {

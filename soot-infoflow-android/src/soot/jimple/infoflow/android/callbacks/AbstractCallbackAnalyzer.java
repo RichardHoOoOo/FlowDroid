@@ -782,6 +782,7 @@ public abstract class AbstractCallbackAnalyzer {
 		Set<SootClass> visited = new HashSet<>();
 		while(curCls.isInnerClass()) {
 			if(! visited.add(curCls)) break;
+			if(Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), curCls.getType())) break;
 			SootClass outerClass = curCls.getOuterClass();
 			if(isComponent(outerClass) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), outerClass.getType())) return true;
 			curCls = outerClass;
