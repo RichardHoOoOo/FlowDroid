@@ -1206,6 +1206,24 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	protected boolean invokesSetPreferencesFromResource(InvokeExpr inv) {
+		String methodName = SootMethodRepresentationParser.v()
+				.getMethodNameFromSubSignature(inv.getMethodRef().getSubSignature().getString());
+		if (!methodName.equals("setPreferencesFromResource"))
+			return false;
+		// In some cases, the bytecode points the invocation to the current
+		// class even though it does not implement setContentView, instead
+		// of using the superclass signature
+		SootClass curClass = inv.getMethod().getDeclaringClass();
+		while (curClass != null) {
+			final String curClassName = curClass.getName();
+			if (curClassName.equals("androidx.preference.PreferenceFragmentCompat"))
+				return true;
+			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
+		}
+		return false;
+	}
+
 	protected void analyzeMethodOverrideCallbacks(SootClass sootClass) {
 		if (!sootClass.isConcrete())
 			return;

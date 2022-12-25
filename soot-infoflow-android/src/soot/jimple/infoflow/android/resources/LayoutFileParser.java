@@ -276,7 +276,11 @@ public class LayoutFileParser extends AbstractResourceParser {
 					logger.warn("Invalid target resource " + attr.getValue() + "for fragment class value");
 				getLayoutClass(attr.getValue().toString());
 			}
-		} else {
+		} else if (tname.equals("Preference")) {
+			AXmlAttribute<?> attr = rootNode.getAttribute("fragment");
+			if(attr == null) attr = rootNode.getAttribute("app:fragment");
+			if(attr != null) addFragment(layoutFile, getLayoutClass(attr.getValue().toString()), new HashSet<>());
+		}else {
 			final SootClass childClass = getLayoutClass(tname);
 			if (childClass != null && (isLayoutClass(childClass) || isViewClass(childClass)))
 				parseLayoutAttributes(layoutFile, childClass, rootNode);

@@ -305,6 +305,14 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 									this.layoutClasses.put(component, intValue);
 							}
 						}
+						if (invokesSetPreferencesFromResource(inv)) {
+							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(0), Integer.class);
+							if (intValue != null) {
+								Set<SootClass> components = findDeclaringComponents(sm, false);
+								for(SootClass component: components) 
+									this.layoutClasses.put(component, intValue);
+							}
+						}
 					}
 				}
 			}

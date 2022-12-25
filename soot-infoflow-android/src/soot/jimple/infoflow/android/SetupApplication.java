@@ -1096,9 +1096,28 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					// Add the fragments for this class
 					Set<SootClass> fragments = lfp.getFragments().get(layoutFileName);
 					if (fragments != null) {
-						for (SootClass fragment : fragments) {
-							if (fragmentClasses.put(callbackClass, fragment)) 
-								hasNewCallback = true;
+						if(this.activityNames.contains(callbackClass.getName())) {
+							for (SootClass fragment : fragments) {
+								if (fragmentClasses.put(callbackClass, fragment)) {
+									hasNewCallback = true;
+								}
+							}
+						} else {
+							// When callbackClass is not an activity, we searches for activity that contains the callbackClass
+							Set<SootClass> containerActivities = new HashSet<>();
+							for(SootClass activityCls: fragmentClasses.keySet()) {
+								if(fragmentClasses.get(activityCls).contains(callbackClass)) containerActivities.add(activityCls);
+							}
+							for(SootClass activityCls: jimpleClass.getFragmentClasses().keySet()) {
+								if(jimpleClass.getFragmentClasses().get(activityCls).contains(callbackClass)) containerActivities.add(activityCls);
+							}
+							for(SootClass containerActivity: containerActivities) {
+								for (SootClass fragment : fragments) {
+									if (fragmentClasses.put(containerActivity, fragment)) {
+										hasNewCallback = true;
+									}
+								}
+							}
 						}
 					}
 
