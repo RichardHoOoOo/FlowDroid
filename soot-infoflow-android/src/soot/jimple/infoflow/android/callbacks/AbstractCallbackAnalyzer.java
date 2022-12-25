@@ -80,6 +80,7 @@ import soot.jimple.infoflow.android.callbacks.filters.UnreachableConstructorFilt
 import soot.jimple.infoflow.android.callbacks.filters.ApplicationCallbackFilter;
 import soot.jimple.infoflow.android.callbacks.filters.AlienHostComponentFilter;
 import soot.jimple.NewExpr;
+import soot.jimple.StringConstant;
 
 import java.util.Stack;
 
@@ -765,6 +766,36 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 	}
 
+	protected void analyzeMethodForPrefFragment(SootClass lifecycleElement, SootMethod method) {
+		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName())) return;
+
+		if (!method.isConcrete() || !method.hasActiveBody()) return;
+
+		for (Unit u : method.getActiveBody().getUnits()) {
+			Stmt stmt = (Stmt) u;
+			if (stmt.containsInvokeExpr()) {
+				final String className = stmt.getInvokeExpr().getMethod().getDeclaringClass().getName();
+				final String methodName = stmt.getInvokeExpr().getMethod().getName();
+				if(! className.equals("androidx.preference.Preference") && ! className.equals("android.support.v7.preference.Preference")) continue;
+				if(! methodName.equals("setFragment")) continue;
+				for (int i = 0; i < stmt.getInvokeExpr().getArgCount(); i++) {
+					Value arg = stmt.getInvokeExpr().getArg(i);
+					if(arg instanceof StringConstant) {
+						SootClass fragCls = Scene.v().getSootClassUnsafe(((StringConstant) arg).value);
+						if(fragCls != null) {
+							boolean addFragment = scSupportFragment != null && Scene.v().getFastHierarchy().canStoreType(fragCls.getType(), scSupportFragment.getType());
+							addFragment |= scAndroidXFragment != null && Scene.v().getFastHierarchy().canStoreType(fragCls.getType(), scAndroidXFragment.getType());
+							if (addFragment) {
+								Set<SootClass> activities = findDeclaringComponents(method, true);
+								for(SootClass activity: activities) checkAndAddFragment(activity, fragCls);	
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	private boolean isComponent(SootClass cls) {
 		// return appComponents.contains(cls);
 		boolean isComponent = activityCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), activityCls.getType());
@@ -1209,7 +1240,7 @@ public abstract class AbstractCallbackAnalyzer {
 	protected boolean invokesSetPreferencesFromResource(InvokeExpr inv) {
 		String methodName = SootMethodRepresentationParser.v()
 				.getMethodNameFromSubSignature(inv.getMethodRef().getSubSignature().getString());
-		if (!methodName.equals("setPreferencesFromResource"))
+		if (!methodName.equals("setPreferencesFromResource") && !methodName.equals("addPreferencesFromResource"))
 			return false;
 		// In some cases, the bytecode points the invocation to the current
 		// class even though it does not implement setContentView, instead
@@ -1217,7 +1248,7 @@ public abstract class AbstractCallbackAnalyzer {
 		SootClass curClass = inv.getMethod().getDeclaringClass();
 		while (curClass != null) {
 			final String curClassName = curClass.getName();
-			if (curClassName.equals("androidx.preference.PreferenceFragmentCompat"))
+			if (curClassName.equals("androidx.preference.PreferenceFragmentCompat") || curClassName.equals("android.support.v7.preference.PreferenceFragmentCompat"))
 				return true;
 			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
 		}
