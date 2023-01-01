@@ -858,7 +858,7 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
-	private boolean isInValidInitInvokeFromDummyMain(SootMethod from, SootMethod to) {
+	private boolean isInvalidInitInvokeFromDummyMain(SootMethod from, SootMethod to) {
 		SootClass compCls = null;
 		String clsName = from.getDeclaringClass().getName();
 		String mtdName = from.getName();
@@ -983,7 +983,7 @@ public abstract class AbstractCallbackAnalyzer {
 					SootClass tgtCls = edge.tgt().getDeclaringClass();
 					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
 					
-					if(isInValidInitInvokeFromDummyMain(top, edge.tgt())) continue;
+					if(isInvalidInitInvokeFromDummyMain(top, edge.tgt())) continue;
 
 					boolean notAllowedAtUnit = false;
 					if(edge.srcStmt() != null && edge.srcStmt().containsInvokeExpr() && edge.srcStmt().getInvokeExpr().getMethod().getName().equals(edge.tgt().getName())) {
