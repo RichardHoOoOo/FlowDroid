@@ -858,6 +858,19 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	private boolean isInValidInitInvokeFromDummyMain(SootMethod from, SootMethod to) {
+		SootClass compCls = null;
+		String clsName = from.getDeclaringClass().getName();
+		String mtdName = from.getName();
+		SootClass rtnCls = null;
+		Type rtnType = from.getReturnType();
+		if(rtnType instanceof RefType) rtnCls = ((RefType) rtnType).getSootClass();
+		if(clsName.equals("dummyMainClass") && mtdName.startsWith("dummyMainMethod_") && rtnCls != null) compCls = rtnCls;
+
+		if(compCls != null && to.isConstructor() && ! to.getDeclaringClass().equals(compCls)) return true;
+		return false;
+	}
+
 	private boolean isBackMethod(SootMethod mtd) {
 		if(SystemClassHandler.v().isClassInSystemPackage(mtd.getDeclaringClass().getName())) return false;
 		String subSig = mtd.getSubSignature();
@@ -970,6 +983,8 @@ public abstract class AbstractCallbackAnalyzer {
 					SootClass tgtCls = edge.tgt().getDeclaringClass();
 					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
 					
+					if(isInValidInitInvokeFromDummyMain(top, edge.tgt())) continue;
+
 					boolean notAllowedAtUnit = false;
 					if(edge.srcStmt() != null && edge.srcStmt().containsInvokeExpr() && edge.srcStmt().getInvokeExpr().getMethod().getName().equals(edge.tgt().getName())) {
 						for(Pair<Unit, List<SootMethod>> pair: allowedCalleeAtUnitPairs) {
