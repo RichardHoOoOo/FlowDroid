@@ -5,9 +5,11 @@ import soot.Scene;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointConstants;
+import soot.jimple.infoflow.android.callbacks.AbstractCallbackAnalyzer;
 
 import java.util.Set;
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * Filter for ruling out objects for which no factory method or allocation site
@@ -46,6 +48,14 @@ public class UnreachableConstructorFilter extends AbstractCallbackFilter {
 				if (component == outerClass)
 					return true;
 				curHandler = outerClass;
+			}
+		}
+
+		{
+			// Use string analysis to check outer classes again
+			List<SootClass> outerClasses = AbstractCallbackAnalyzer.getAllOuterClasses(callbackHandler);
+			for(SootClass outerCls: outerClasses) {
+				if (component == outerCls) return true;
 			}
 		}
 

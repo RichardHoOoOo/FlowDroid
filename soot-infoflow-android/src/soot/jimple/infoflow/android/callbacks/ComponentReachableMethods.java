@@ -96,11 +96,13 @@ public class ComponentReachableMethods {
 								// class L overrides foo(), make sure that
 								// all calls to P.foo() in the
 								// context of L only go to L.foo().
-								SootClass calleeClass = refMethod.getDeclaringClass();
-								if (Scene.v().getFastHierarchy().isSubclass(originalComponent, calleeClass)) {
-									SootClass targetClass = e.getTgt().method().getDeclaringClass();
-									return targetClass == originalComponent
-											|| Scene.v().getFastHierarchy().isSubclass(targetClass, originalComponent);
+								if(originalComponent.getMethodUnsafe(refMethod.getSubSignature()) != null) {
+									SootClass calleeClass = refMethod.getDeclaringClass();
+									if (Scene.v().getFastHierarchy().isSubclass(originalComponent, calleeClass)) {
+										SootClass targetClass = e.getTgt().method().getDeclaringClass();
+										return targetClass == originalComponent
+												|| Scene.v().getFastHierarchy().isSubclass(targetClass, originalComponent);
+									}
 								}
 							}
 

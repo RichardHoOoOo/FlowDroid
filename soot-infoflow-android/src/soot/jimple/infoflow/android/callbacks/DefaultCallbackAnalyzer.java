@@ -13,11 +13,13 @@ import heros.solver.Pair;
 import soot.MethodOrMethodContext;
 import soot.PackManager;
 import soot.RefType;
+import soot.Type;
 import soot.Scene;
 import soot.SceneTransformer;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.Transform;
+import soot.Local;
 import soot.Unit;
 import soot.Value;
 import soot.jimple.InvokeExpr;
@@ -296,6 +298,22 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 										this.layoutClasses.put(activity, intValue);
 								}
 
+							}
+						}
+						if(invokesDataBindingUtilSetContentView(inv)) {
+							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(1), Integer.class);
+							if (intValue != null && inv.getArg(0) instanceof Local) {
+								Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) inv.getArg(0)).possibleTypes();
+								for(Type possibleType: possibleTypes) {
+									if(possibleType instanceof RefType) {
+										SootClass actCls = ((RefType) possibleType).getSootClass();
+										boolean extendsActivity = activityCls != null && Scene.v().getFastHierarchy().canStoreType(possibleType, activityCls.getType());
+										if(! extendsActivity) continue;
+										if(! actCls.isConcrete()) continue;
+										if(SystemClassHandler.v().isClassInSystemPackage(actCls.getName())) continue;
+										this.layoutClasses.put(actCls, intValue);
+									}
+								}	
 							}
 						}
 						if (invokesInflate(inv)) {

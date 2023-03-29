@@ -2,6 +2,7 @@ package soot.jimple.infoflow.android.callbacks.filters;
 
 import java.util.Set;
 import java.util.HashSet;
+import java.util.List;
 
 import soot.RefType;
 import soot.Scene;
@@ -9,6 +10,7 @@ import soot.SootClass;
 import soot.SootMethod;
 import soot.Type;
 import soot.jimple.infoflow.android.entryPointCreators.AndroidEntryPointConstants;
+import soot.jimple.infoflow.android.callbacks.AbstractCallbackAnalyzer;
 
 /**
  * A callback filter that disallows inner classes from being used in other host
@@ -85,6 +87,15 @@ public class AlienHostComponentFilter extends AbstractCallbackFilter {
 					return false;
 				}
 				curHandler = outerClass;
+			}
+		}
+
+		{
+			// Use string analysis to check outer classes again
+			List<SootClass> outerClasses = AbstractCallbackAnalyzer.getAllOuterClasses(callbackHandler);
+			for(SootClass outerCls: outerClasses) {
+				if(Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), outerCls.getType())) break;
+				if (components.contains(outerCls) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), outerCls.getType())) return false;
 			}
 		}
 

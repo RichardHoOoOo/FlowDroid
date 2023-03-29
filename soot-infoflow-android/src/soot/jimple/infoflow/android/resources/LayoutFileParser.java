@@ -268,9 +268,9 @@ public class LayoutFileParser extends AbstractResourceParser {
 			// final AXmlAttribute<?> attrID = rootNode.getAttribute("id");
 			if (attr == null)
 				logger.warn("Fragment without class name or id detected");
-			else if (rootNode.getAttribute("navGraph") != null)
+			else if (rootNode.getAttribute("navGraph") != null) {
 				parseIncludeAttributes(layoutFile, rootNode);
-			else {
+			} else {
 				addFragment(layoutFile, getLayoutClass(attr.getValue().toString()), new HashSet<>());
 				if (attr.getType() != AxmlVisitor.TYPE_STRING)
 					logger.warn("Invalid target resource " + attr.getValue() + "for fragment class value");

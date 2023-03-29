@@ -677,7 +677,7 @@ public abstract class AbstractCallbackAnalyzer {
 			if (stmt.containsInvokeExpr()) {
 				final String className = stmt.getInvokeExpr().getMethod().getDeclaringClass().getName();
 				final String methodName = stmt.getInvokeExpr().getMethod().getName();
-				if(! className.equals("android.support.v4.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.FragmentTransaction")) continue;
+				if(! className.equals("android.support.v4.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.BackStackRecord") && ! className.equals("android.support.v4.app.BackStackRecord")) continue;
 				if(! methodName.equals("add") && ! methodName.equals("replace")) continue;
 				for (int i = 0; i < stmt.getInvokeExpr().getArgCount(); i++) {
 					Value br = stmt.getInvokeExpr().getArg(i);
@@ -848,12 +848,28 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	public static List<SootClass> getAllOuterClasses(SootClass innerCls) {
+		List<SootClass> outerClasses = new ArrayList<>();
+		String clsName = innerCls.getName();
+		if(! clsName.contains("$")) return outerClasses;
+		boolean preCharIsDollar = false;
+		for(int i=clsName.length()-1; i>=0; i--) {
+			if(clsName.charAt(i) == '$') preCharIsDollar = true;
+			else {
+				if(preCharIsDollar) {
+					SootClass outerCls = Scene.v().getSootClassUnsafe(clsName.substring(0, i+1));
+					if(outerCls != null && ! outerClasses.contains(outerCls)) outerClasses.add(outerCls);
+				}
+				preCharIsDollar = false;
+			}
+		}
+		return outerClasses;
+	}
+
 	private boolean syntheticClassNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
-		if(! topCls.isInnerClass() && ((topCls.getModifiers() & soot.Modifier.SYNTHETIC) != 0) && topCls.getName().contains("$")) {
-			// Class whose name contains "$$" may not be an inner class. E.g., ml.docilealligator.infinityforreddit.activities.MainActivity$$ExternalSyntheticLambda17
-			String prefix = topCls.getName().split("\\$")[0];
-			SootClass prefixCls = Scene.v().getSootClassUnsafe(prefix);
-			if(prefixCls != null && isComponent(prefixCls) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), prefixCls.getType())) return true;
+		List<SootClass> outerClasses = getAllOuterClasses(topCls);
+		for(SootClass outerCls: outerClasses) {
+			if(isComponent(outerCls) && ! Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), outerCls.getType())) return true;
 		}
 		return false;
 	}
@@ -1225,6 +1241,17 @@ public abstract class AbstractCallbackAnalyzer {
 			// return false;
 			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
 		}
+		return false;
+	}
+
+	protected boolean invokesDataBindingUtilSetContentView(InvokeExpr inv) {
+		String methodName = SootMethodRepresentationParser.v()
+				.getMethodNameFromSubSignature(inv.getMethodRef().getSubSignature().getString());
+		if (!methodName.equals("setContentView"))
+			return false;
+
+		String className = inv.getMethod().getDeclaringClass().getName();
+		if (className.equals("android.databinding.DataBindingUtil") || className.equals("androidx.databinding.DataBindingUtil")) return true;
 		return false;
 	}
 
