@@ -1272,7 +1272,25 @@ public abstract class AbstractCallbackAnalyzer {
 		SootClass curClass = inv.getMethod().getDeclaringClass();
 		while (curClass != null) {
 			final String curClassName = curClass.getName();
-			if (curClassName.equals("android.view.LayoutInflater"))
+			if (curClassName.equals("android.view.LayoutInflater") || curClassName.equals("androidx.navigation.NavInflater") || curClassName.equals("androidx.asynclayoutinflater.view.AsyncLayoutInflater") || curClassName.equals("android.support.v4.view.AsyncLayoutInflater"))
+				return true;
+			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
+		}
+		return false;
+	}
+
+	protected boolean invokesDataBindingInflate(InvokeExpr inv) {
+		String methodName = SootMethodRepresentationParser.v()
+				.getMethodNameFromSubSignature(inv.getMethodRef().getSubSignature().getString());
+		if (!methodName.equals("inflateInternal"))
+			return false;
+		// In some cases, the bytecode points the invocation to the current
+		// class even though it does not implement setContentView, instead
+		// of using the superclass signature
+		SootClass curClass = inv.getMethod().getDeclaringClass();
+		while (curClass != null) {
+			final String curClassName = curClass.getName();
+			if (curClassName.equals("androidx.databinding.ViewDataBinding"))
 				return true;
 			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
 		}
