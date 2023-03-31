@@ -317,7 +317,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 							}
 						}
 						if (invokesInflate(inv)) {
-							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(1), Integer.class);
+							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(0), Integer.class);
 							if (intValue != null) {
 								Set<SootClass> components = findDeclaringComponents(sm, false);
 								for(SootClass component: components) 
@@ -325,7 +325,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 							}
 						}
 						if (invokesDataBindingInflate(inv)) {
-							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(0), Integer.class);
+							Integer intValue = valueProvider.getValue(sm, stmt, inv.getArg(1), Integer.class);
 							if (intValue != null) {
 								Set<SootClass> components = findDeclaringComponents(sm, false);
 								for(SootClass component: components) 
