@@ -1069,12 +1069,15 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 					if (callbackMethods != null) {
 						for (String methodName : callbackMethods) {
 							final String subSig = "void " + methodName + "(android.view.View)";
+							final String subSig2 = "void " + methodName + "(android.view.MenuItem)";
 
 							// The callback may be declared directly in the
 							// class or in one of the superclasses
 							SootClass currentClass = callbackClass;
 							while (true) {
 								SootMethod callbackMethod = currentClass.getMethodUnsafe(subSig);
+								if (callbackMethod == null) callbackMethod = currentClass.getMethodUnsafe(subSig2);
+								
 								if (callbackMethod != null) {
 									if (this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(
 											callbackMethod, smViewOnClick, CallbackType.Widget)))

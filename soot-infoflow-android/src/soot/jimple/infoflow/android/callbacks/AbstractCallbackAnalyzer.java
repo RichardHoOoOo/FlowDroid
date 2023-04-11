@@ -1272,7 +1272,7 @@ public abstract class AbstractCallbackAnalyzer {
 		SootClass curClass = inv.getMethod().getDeclaringClass();
 		while (curClass != null) {
 			final String curClassName = curClass.getName();
-			if (curClassName.equals("android.view.LayoutInflater") || curClassName.equals("androidx.navigation.NavInflater") || curClassName.equals("androidx.asynclayoutinflater.view.AsyncLayoutInflater") || curClassName.equals("android.support.v4.view.AsyncLayoutInflater"))
+			if (curClassName.equals("android.view.LayoutInflater") || curClassName.equals("android.view.MenuInflater") || curClassName.equals("androidx.navigation.NavInflater") || curClassName.equals("androidx.asynclayoutinflater.view.AsyncLayoutInflater") || curClassName.equals("android.support.v4.view.AsyncLayoutInflater"))
 				return true;
 			curClass = curClass.hasSuperclass() ? curClass.getSuperclass() : null;
 		}

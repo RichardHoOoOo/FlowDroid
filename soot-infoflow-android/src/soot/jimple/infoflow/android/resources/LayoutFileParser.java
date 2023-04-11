@@ -137,7 +137,6 @@ public class LayoutFileParser extends AbstractResourceParser {
 		if(! visited.add(layoutFile)) return;
 		layoutFile = layoutFile.replace("/layout-large/", "/layout/");
 		callbackMethods.put(layoutFile, callback);
-
 		// Recursively process any dependencies we might have collected before
 		// we have processed the target
 		if (includeDependencies.containsKey(layoutFile))
@@ -229,7 +228,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 
 				try {
 					AXmlHandler handler = new AXmlHandler(stream, new AXML20Parser());
-					parseLayoutNode(fileName, handler.getDocument().getRootNode());
+					parseLayoutNode(fileName, handler.getDocument().getRootNode(), null);
 				} catch (Exception ex) {
 					logger.error("Could not read binary XML file " + fileName + ": " + ex.getMessage(), ex);
 				}
@@ -243,7 +242,7 @@ public class LayoutFileParser extends AbstractResourceParser {
 	 * @param layoutFile The full path and file name of the file being parsed
 	 * @param rootNode   The root node from where to start parsing
 	 */
-	private void parseLayoutNode(String layoutFile, AXmlNode rootNode) {
+	private void parseLayoutNode(String layoutFile, AXmlNode rootNode, String parentTagName) {
 		if (rootNode.getTag() == null || rootNode.getTag().isEmpty()) {
 			logger.warn("Encountered a null or empty node name in file %s, skipping node...", layoutFile);
 			return;
@@ -284,11 +283,13 @@ public class LayoutFileParser extends AbstractResourceParser {
 			final SootClass childClass = getLayoutClass(tname);
 			if (childClass != null && (isLayoutClass(childClass) || isViewClass(childClass)))
 				parseLayoutAttributes(layoutFile, childClass, rootNode);
+			if(tname.equals("item") && parentTagName != null && (parentTagName.equals("menu") || parentTagName.equals("group")))
+				parseLayoutAttributes(layoutFile, scView, rootNode);
 		}
 
 		// Parse the child nodes
 		for (AXmlNode childNode : rootNode.getChildren())
-			parseLayoutNode(layoutFile, childNode);
+			parseLayoutNode(layoutFile, childNode, tname);
 	}
 
 	/**

@@ -61,7 +61,7 @@ public class LayoutControlFactory {
 	 */
 	protected AndroidLayoutControl createLayoutControl(SootClass layoutClass) {
 		if (scEditText != null
-				&& Scene.v().getFastHierarchy().canStoreType(layoutClass.getType(), scEditText.getType()))
+				&& Scene.v().getOrMakeFastHierarchy().canStoreType(layoutClass.getType(), scEditText.getType()))
 			return new EditTextControl(layoutClass);
 		else
 			return new GenericLayoutControl(layoutClass);
