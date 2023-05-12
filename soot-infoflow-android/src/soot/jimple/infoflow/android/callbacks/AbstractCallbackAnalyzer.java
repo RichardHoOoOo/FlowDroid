@@ -131,6 +131,8 @@ public abstract class AbstractCallbackAnalyzer {
 
 	protected final SootClass viewGroup = Scene.v().getSootClassUnsafe("android.view.ViewGroup");
 	protected final SootClass scViewClass = Scene.v().getSootClassUnsafe("android.view.View");
+	protected final SootClass scListView = Scene.v().getSootClassUnsafe("android.widget.AbsListView");
+	protected final SootClass scSpinner = Scene.v().getSootClassUnsafe("android.widget.AbsSpinner");
 
 	protected final SootClass adapter = Scene.v().getSootClassUnsafe("android.widget.Adapter");
 	protected final SootClass expandableListAdapter = Scene.v().getSootClassUnsafe("android.widget.ExpandableListAdapter");
@@ -1035,7 +1037,11 @@ public abstract class AbstractCallbackAnalyzer {
 											logger.warn("Unsupported type detected in callback analysis");
 											continue;
 										}
-										if(Scene.v().getOrMakeFastHierarchy().resolveMethod(baseType.getSootClass(), iExpr.getMethodRef(), false) == edge.tgt() && reachableObjs.contains(baseType.getSootClass())) {
+										if(Scene.v().getOrMakeFastHierarchy().resolveMethod(baseType.getSootClass(), iExpr.getMethodRef(), false) == edge.tgt() 
+											&& (reachableObjs.contains(baseType.getSootClass()) 
+												|| (scViewClass != null && Scene.v().getOrMakeFastHierarchy().canStoreType(baseType, scViewClass.getType())) 
+												|| (scListView != null && Scene.v().getOrMakeFastHierarchy().canStoreType(baseType, scListView.getType())) 
+												|| (scSpinner != null && Scene.v().getOrMakeFastHierarchy().canStoreType(baseType, scSpinner.getType())))) {
 											tgtAllowed = true;
 											break;
 										}

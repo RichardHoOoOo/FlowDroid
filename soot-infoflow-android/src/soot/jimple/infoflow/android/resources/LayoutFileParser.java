@@ -54,6 +54,8 @@ public class LayoutFileParser extends AbstractResourceParser {
 	private boolean loadOnlySensitiveControls = false;
 	private SootClass scViewGroup = null;
 	private SootClass scView = null;
+	private SootClass scListView = null;
+	private SootClass scSpinner = null;
 	private SootClass scWebView = null;
 
 	private LayoutControlFactory controlFactory = new LayoutControlFactory();
@@ -121,6 +123,10 @@ public class LayoutFileParser extends AbstractResourceParser {
 		if (scView != null && fh.canStoreType(theClass.getType(), scView.getType()))
 			return true;
 		if (scWebView != null && fh.canStoreType(theClass.getType(), scWebView.getType()))
+			return true;
+		if (scListView != null && fh.canStoreType(theClass.getType(), scListView.getType()))
+			return true;
+		if (scSpinner != null && fh.canStoreType(theClass.getType(), scSpinner.getType()))
 			return true;
 
 		logger.warn(String.format("Layout class %s is not derived from android.view.View", theClass.getName()));
@@ -207,6 +213,8 @@ public class LayoutFileParser extends AbstractResourceParser {
 				// Initialize the Soot classes
 				scViewGroup = Scene.v().getSootClassUnsafe("android.view.ViewGroup");
 				scView = Scene.v().getSootClassUnsafe("android.view.View");
+				scListView = Scene.v().getSootClassUnsafe("android.widget.AbsListView");
+				scSpinner = Scene.v().getSootClassUnsafe("android.widget.AbsSpinner");
 				scWebView = Scene.v().getSootClassUnsafe("android.webkit.WebView");
 
 				// Get the fully-qualified class name
