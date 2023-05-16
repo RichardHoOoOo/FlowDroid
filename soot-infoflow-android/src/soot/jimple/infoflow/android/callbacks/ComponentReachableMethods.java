@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.ArrayList;
 
 import soot.Kind;
 import soot.MethodOrMethodContext;
@@ -38,6 +39,7 @@ public class ComponentReachableMethods {
 
 	private final InfoflowAndroidConfiguration config;
 	private final SootClass originalComponent;
+	private final SootClass butterknifeUnbinderCls;
 	private final Set<MethodOrMethodContext> set = new HashSet<MethodOrMethodContext>();
 	private final ChunkedQueue<MethodOrMethodContext> reachables = new ChunkedQueue<MethodOrMethodContext>();
 	private final QueueReader<MethodOrMethodContext> allReachables = reachables.reader();
@@ -54,11 +56,21 @@ public class ComponentReachableMethods {
 	 *                          methods
 	 */
 	public ComponentReachableMethods(InfoflowAndroidConfiguration config, SootClass originalComponent,
-			Collection<MethodOrMethodContext> entryPoints) {
+			Collection<MethodOrMethodContext> entryPoints, SootClass butterknifeUnbinderCls) {
 		this.config = config;
 		this.originalComponent = originalComponent;
 		this.unprocessedMethods = reachables.reader();
+		this.butterknifeUnbinderCls = butterknifeUnbinderCls;
 		addMethods(entryPoints.iterator());
+
+		SootClass viewBindingCls = Scene.v().getSootClassUnsafe(originalComponent.getName() + "_ViewBinding");
+		if(viewBindingCls != null && butterknifeUnbinderCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(viewBindingCls.getType(), butterknifeUnbinderCls.getType())) {
+			for(SootMethod mtd: new ArrayList<>(viewBindingCls.getMethods())) {
+				if(! mtd.isConstructor()) continue;
+				if(! mtd.isConcrete()) continue;
+				addMethod(mtd);
+			}
+		}
 	}
 
 	private void addMethods(Iterator<MethodOrMethodContext> methods) {

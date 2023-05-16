@@ -661,10 +661,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		logger.info("Constructing the callgraph...");
 		PackManager.v().getPack("cg").apply();
 	
-		if(this.cgInstruHandler != null) {
-			cgInstruHandler.onBeforeInstru();
-			cgInstruHandler.onAfterInstru();
-		}
+		if(this.cgInstruHandler != null) cgInstruHandler.onBeforeInstru();
 
 		// ICC instrumentation
 		if (iccInstrumenter != null)
@@ -834,6 +831,9 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 				lfp.parseLayoutFileDirect(config.getAnalysisFileConfig().getTargetAPKFile());
 				PackManager.v().getPack("wjtp").apply();
+
+				// Put this call after the wjtp phase because wjpt phase needs the initializations to find reachable objects from a component
+				if(cgInstruHandler != null) cgInstruHandler.onAfterInstru(); 
 
 				// Creating all callgraph takes time and memory. Check whether
 				// the solver has been aborted in the meantime

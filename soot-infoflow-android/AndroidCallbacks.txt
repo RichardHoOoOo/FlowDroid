@@ -1336,3 +1336,4 @@ android.support.v7.widget.RecyclerView$SmoothScroller$ScrollVectorProvider
 android.support.v7.widget.ShareActionProvider
 android.support.wear.ambient.AmbientMode$AmbientCallbackProvider
 android.support.wear.ambient.AmbientModeSupport$AmbientCallbackProvider
+butterknife.internal.DebouncingOnClickListener

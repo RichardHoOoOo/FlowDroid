@@ -218,7 +218,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	private void analyzeReachableMethods(SootClass lifecycleElement, List<MethodOrMethodContext> methods) {
 		// Make sure to exclude all other edges in the callgraph except for the
 		// edges start in the lifecycle methods we explicitly pass in
-		ComponentReachableMethods rm = new ComponentReachableMethods(config, lifecycleElement, methods);
+		ComponentReachableMethods rm = new ComponentReachableMethods(config, lifecycleElement, methods, butterknifeUnbinderCls);
 		rm.update();
 
 		// Scan for listeners in the class hierarchy

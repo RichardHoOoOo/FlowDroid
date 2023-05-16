@@ -143,6 +143,8 @@ public abstract class AbstractCallbackAnalyzer {
 
 	protected final SootClass OnBackPressedCallback = Scene.v().getSootClassUnsafe("androidx.activity.OnBackPressedCallback");
 
+	protected final SootClass butterknifeUnbinderCls = Scene.v().getSootClassUnsafe("butterknife.Unbinder");
+
 	protected final InfoflowAndroidConfiguration config;
 	protected final Set<SootClass> entryPointClasses;
 	protected final Set<String> androidCallbacks;
@@ -433,7 +435,9 @@ public abstract class AbstractCallbackAnalyzer {
 		// Analyze all found callback classes
 		for (SootClass callbackClass : callbackClasses) {
 			for(SootClass component: components) { // Check if the callback type can be initialized in methods that are reachable from the component, if not, the type resolved by pointsTo analysis may be a FP
-				if(isReachableObj(component, callbackClass)) analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
+				if(isReachableObj(component, callbackClass)) {
+					analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
+				}
 			}
 		}
 	}
@@ -850,10 +854,24 @@ public abstract class AbstractCallbackAnalyzer {
 		return false;
 	}
 
+	private boolean viewBindingNotMatchesComponent(SootClass currComponent, SootMethod to) {
+		SootClass toCls = to.getDeclaringClass();
+		if(to.isConstructor() && toCls.getName().endsWith("_ViewBinding") && this.butterknifeUnbinderCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(toCls.getType(), this.butterknifeUnbinderCls.getType())) {
+			String baseName = toCls.getName().substring(0, toCls.getName().indexOf("_ViewBinding"));
+			SootClass baseCls = Scene.v().getSootClassUnsafe(baseName);
+			if(baseCls != null && this.isComponent(baseCls)) {
+				if(Scene.v().getOrMakeFastHierarchy().canStoreType(currComponent.getType(), baseCls.getType())) return false;
+				else return true;
+			}
+		}
+		return false;
+	}
+
 	public static List<SootClass> getAllOuterClasses(SootClass innerCls) {
 		List<SootClass> outerClasses = new ArrayList<>();
 		String clsName = innerCls.getName();
 		if(! clsName.contains("$")) return outerClasses;
+		outerClasses.add(innerCls);
 		boolean preCharIsDollar = false;
 		for(int i=clsName.length()-1; i>=0; i--) {
 			if(clsName.charAt(i) == '$') preCharIsDollar = true;
@@ -884,7 +902,6 @@ public abstract class AbstractCallbackAnalyzer {
 		Type rtnType = from.getReturnType();
 		if(rtnType instanceof RefType) rtnCls = ((RefType) rtnType).getSootClass();
 		if(clsName.equals("dummyMainClass") && mtdName.startsWith("dummyMainMethod_") && rtnCls != null) compCls = rtnCls;
-
 		if(compCls != null && to.isConstructor() && ! to.getDeclaringClass().equals(compCls)) return true;
 		return false;
 	}
@@ -966,6 +983,7 @@ public abstract class AbstractCallbackAnalyzer {
 					if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
 					if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
 					if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && syntheticClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
+					if(viewBindingNotMatchesComponent(component, top)) continue;
 					// if(isBackMethod(top)) continue;
 					String topClsName = topCls.getName();
 					String topMtdName = top.getName();
@@ -1596,8 +1614,9 @@ public abstract class AbstractCallbackAnalyzer {
 			CallbackType callbackType = isUICallback(sc) ? CallbackType.Widget : CallbackType.Default;
 			for (SootMethod sm : sc.getMethods()) {
 				SootMethod callbackImplementation = getMethodFromHierarchyEx(baseClass, sm.getSubSignature());
-				if (callbackImplementation != null)
+				if (callbackImplementation != null) {
 					checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType, baseClass);
+				}
 			}
 		}
 	}
