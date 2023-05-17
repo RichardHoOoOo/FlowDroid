@@ -83,6 +83,26 @@ public class Abstraction implements Cloneable, FastSolverLinkedNode<Abstraction,
 	protected AtomicBitSet pathFlags = null;
 	protected int propagationPathLength = 0;
 
+	protected List<Unit> sinkUnits;
+
+	public void addSinkUnit(Unit sinkUnit) {
+		if(this.sinkUnits == null) this.sinkUnits = new ArrayList<>();
+		if(! this.sinkUnits.contains(sinkUnit)) this.sinkUnits.add(sinkUnit);
+	}
+
+	public void copySinkUnitsFrom(Abstraction abs) {
+		if(abs.sinkUnits != null && ! abs.sinkUnits.isEmpty()) {
+			if(this.sinkUnits == null) this.sinkUnits = new ArrayList<>();
+			for(Unit u: abs.sinkUnits) {
+				if(! this.sinkUnits.contains(u)) this.sinkUnits.add(u);
+			}
+		}
+	}
+
+	public List<Unit> getSinkUnits() {
+		return this.sinkUnits;
+	}
+
 	public static class NeighborHashingStrategy implements HashingStrategy<Abstraction> {
 
 		private static final long serialVersionUID = 4836518478381414909L;
