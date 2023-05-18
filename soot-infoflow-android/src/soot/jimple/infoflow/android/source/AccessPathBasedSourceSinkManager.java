@@ -366,7 +366,7 @@ public class AccessPathBasedSourceSinkManager extends AndroidSourceSinkManager {
 			for (AccessPathTuple apt : ssdef.getAccessPaths()) {
 				if (apt.getSourceSinkType().isSink()) {
 					apsTuple.add(apt);
-					aps.add(apt.toAccessPath(sCallSite.getFieldRef(), manager, true));
+					aps.add(apt.toAccessPath(ssdef.getLocal(), manager, true));
 				}
 				return new SourceInfo(apDef.filter(apsTuple), aps);
 			}
