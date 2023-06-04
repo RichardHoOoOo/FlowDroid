@@ -56,6 +56,7 @@ import soot.jimple.ClassConstant;
 import soot.jimple.FieldRef;
 import soot.jimple.IdentityStmt;
 import soot.jimple.InstanceInvokeExpr;
+import soot.jimple.SpecialInvokeExpr;
 import soot.jimple.InvokeExpr;
 import soot.jimple.ReturnStmt;
 import soot.jimple.ReturnVoidStmt;
@@ -1041,7 +1042,7 @@ public abstract class AbstractCallbackAnalyzer {
 								boolean isLifecycleInvokes = iExpr.getMethod().getSubSignature().equals("void onActivityResult(int,int,android.content.Intent)")
 									|| iExpr.getMethod().getSubSignature().equals("void onServiceConnected(android.content.ComponentName,android.os.IBinder)");
 
-								if(iExpr instanceof InstanceInvokeExpr && (! isLibInvoke || isLifecycleInvokes)) {
+								if(iExpr instanceof InstanceInvokeExpr && ! (iExpr instanceof SpecialInvokeExpr) && (! isLibInvoke || isLifecycleInvokes)) {
 									Value receiver = ((InstanceInvokeExpr) iExpr).getBase();
 									Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) receiver).possibleTypes();
 									boolean tgtAllowed = false;
