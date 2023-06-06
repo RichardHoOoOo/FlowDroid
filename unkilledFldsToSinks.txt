@@ -1,4 +1,0 @@
-real: <org.woheller69.weather.database.CityToWatch: float lat> ==> <org.woheller69.weather.activities.RainViewerActivity: void onCreate(android.os.Bundle)>1
-real: <org.woheller69.weather.database.City: float lon> ==> <org.woheller69.weather.dialogs.AddLocationDialogPhotonAPI$1: void onItemClick(android.widget.AdapterView,android.view.View,int,long)>1
-real: <org.woheller69.weather.database.City: float lat> ==> <org.woheller69.weather.dialogs.AddLocationDialogPhotonAPI$1: void onItemClick(android.widget.AdapterView,android.view.View,int,long)>1
-real: <org.woheller69.weather.database.CityToWatch: float lon> ==> <org.woheller69.weather.activities.RainViewerActivity: void onCreate(android.os.Bundle)>1
