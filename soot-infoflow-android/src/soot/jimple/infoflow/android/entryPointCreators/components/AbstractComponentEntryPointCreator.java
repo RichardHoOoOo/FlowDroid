@@ -237,6 +237,9 @@ public abstract class AbstractComponentEntryPointCreator extends AbstractAndroid
 			if (iexpr.getMethodRef().isConstructor())
 				continue;
 
+			if(iexpr.getMethod().getName().startsWith("startActivity"))
+				continue; // Do not add getIntent in methods whose name starts with "startActivity" since it is unlikely to be a callback
+
 			List<Type> types = stmt.getInvokeExpr().getMethod().getParameterTypes();
 			for (int i = 0; i < types.size(); i++) {
 				Type type = types.get(i);
