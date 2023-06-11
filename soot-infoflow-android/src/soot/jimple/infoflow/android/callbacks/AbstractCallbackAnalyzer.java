@@ -938,7 +938,7 @@ public abstract class AbstractCallbackAnalyzer {
 
 	private MultiMap<SootClass, String> compReachableMtds = new HashMultiMap<>(); // Each entry represents the set of reachable method from a component
 	private MultiMap<SootClass, SootClass> compReachableObjs = new HashMultiMap<>(); // Each entry represents the set of class whose instance initialization is reachable from a component
-	private MultiMap<SootClass, SooClass> compReachableClsConsts = new HashMultiMap<>(); // Each entry represents the set of component class constant that is used when initializing intents ot set their classes from a component
+	private MultiMap<SootClass, SootClass> compReachableClsConsts = new HashMultiMap<>(); // Each entry represents the set of component class constant that is used when initializing intents ot set their classes from a component
 	private Map<String, Integer> intentSetClassMethods = new HashMap<>(); // <mtd_sig, class_parameter_index>
 	private Map<String, Integer> componentSetClassMethods = new HashMap<>(); // <mtd_sig, class_parameter_index>
 	
