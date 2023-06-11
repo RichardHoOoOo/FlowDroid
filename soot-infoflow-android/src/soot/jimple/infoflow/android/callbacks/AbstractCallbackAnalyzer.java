@@ -938,14 +938,34 @@ public abstract class AbstractCallbackAnalyzer {
 
 	private MultiMap<SootClass, String> compReachableMtds = new HashMultiMap<>(); // Each entry represents the set of reachable method from a component
 	private MultiMap<SootClass, SootClass> compReachableObjs = new HashMultiMap<>(); // Each entry represents the set of class whose instance initialization is reachable from a component
-
+	private MultiMap<SootClass, SooClass> compReachableClsConsts = new HashMultiMap<>(); // Each entry represents the set of component class constant that is used when initializing intents ot set their classes from a component
+	private Map<String, Integer> intentSetClassMethods = new HashMap<>(); // <mtd_sig, class_parameter_index>
+	private Map<String, Integer> componentSetClassMethods = new HashMap<>(); // <mtd_sig, class_parameter_index>
+	
 	public MultiMap<SootClass, SootClass> getCompReachableObjs() {
 		return this.compReachableObjs;
+	}
+
+	public MultiMap<SootClass, SootClass> getCompReachableClsConsts() {
+		return this.compReachableClsConsts;
 	}
 
 	protected void reConstructCompReachableMtds() {
 		this.compReachableMtds.clear();
 		this.compReachableObjs.clear();
+		this.compReachableClsConsts.clear();
+
+		// Add intentSetClassMethods
+		if(this.intentSetClassMethods.isEmpty() && this.componentSetClassMethods.isEmpty()) {
+			this.intentSetClassMethods.put("<android.content.Intent: void <init>(android.content.Context,java.lang.Class)>", 1);
+			this.intentSetClassMethods.put("<android.content.Intent: void <init>(java.lang.String,android.net.Uri,android.content.Context,java.lang.Class)>", 3);
+			this.intentSetClassMethods.put("<android.content.Intent: android.content.Intent setClass(android.content.Context,java.lang.Class)>", 1);
+			this.intentSetClassMethods.put("<android.content.Intent: android.content.Intent setClassName(java.lang.String,java.lang.String)>", 1);
+			this.intentSetClassMethods.put("<android.content.Intent: android.content.Intent setClassName(android.content.Context,java.lang.String)>", 1);
+			this.componentSetClassMethods.put("<android.content.ComponentName: void <init>(java.lang.String,java.lang.String)>", 1);
+			this.componentSetClassMethods.put("<android.content.ComponentName: void <init>(android.content.Context,java.lang.String)>", 1);
+			this.componentSetClassMethods.put("<android.content.ComponentName: void <init>(android.content.Context,java.lang.Class)>", 1);
+		}
 
 		Map<SootClass, SootMethod> components = new HashMap<>();
 		SootClass dummyMainCls = Scene.v().getSootClassUnsafe("dummyMainClass");
@@ -965,6 +985,7 @@ public abstract class AbstractCallbackAnalyzer {
 		boolean changed = true;
 		do {
 			this.compReachableMtds.clear();
+			this.compReachableClsConsts.clear();
 			preCompReachableObjs = compReachableObjs;
 			compReachableObjs = new HashMultiMap<>();
 
@@ -999,11 +1020,32 @@ public abstract class AbstractCallbackAnalyzer {
 						Body body = top.retrieveActiveBody();
 						if(body != null) {
 							for(Unit u: body.getUnits()) {
-								if(! (u instanceof AssignStmt)) continue;
-								AssignStmt aStmt = (AssignStmt) u;
-								if(! (aStmt.getRightOp() instanceof NewExpr)) continue;
-								NewExpr nExpr = (NewExpr) aStmt.getRightOp();
-								compReachableObjs.put(component, nExpr.getBaseType().getSootClass());
+								if(u instanceof AssignStmt) {
+									AssignStmt aStmt = (AssignStmt) u;
+									if(aStmt.getRightOp() instanceof NewExpr) {
+										NewExpr nExpr = (NewExpr) aStmt.getRightOp();
+										compReachableObjs.put(component, nExpr.getBaseType().getSootClass());
+									}
+								}
+								Stmt stmt = (Stmt) u;
+								if(stmt.containsInvokeExpr()) {
+									InvokeExpr iExpr = stmt.getInvokeExpr();
+									SootClass targetComponent = null;
+									if(this.intentSetClassMethods.containsKey(iExpr.getMethod().getSignature())) {
+										Value clsArg = iExpr.getArg(this.intentSetClassMethods.get(iExpr.getMethod().getSignature()));
+										if(clsArg instanceof ClassConstant) {
+											Type type = ((ClassConstant) clsArg).toSootType();
+											if(type instanceof RefType) targetComponent = ((RefType) type).getSootClass();
+										} else if(clsArg instanceof StringConstant) targetComponent = Scene.v().getSootClassUnsafe(((StringConstant) clsArg).value);
+									} else if(this.componentSetClassMethods.containsKey(iExpr.getMethod().getSignature())) {
+										Value clsArg = iExpr.getArg(this.componentSetClassMethods.get(iExpr.getMethod().getSignature()));
+										if(clsArg instanceof ClassConstant) {
+											Type type = ((ClassConstant) clsArg).toSootType();
+											if(type instanceof RefType) targetComponent = ((RefType) type).getSootClass();
+										} else if(clsArg instanceof StringConstant) targetComponent = Scene.v().getSootClassUnsafe(((StringConstant) clsArg).value);
+									}
+									if(targetComponent != null) compReachableClsConsts.put(component, targetComponent);
+								}
 							}
 						}
 					}

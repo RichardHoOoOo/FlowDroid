@@ -191,6 +191,12 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		return this.compReachableObjs;
 	}
 
+	protected MultiMap<SootClass, SootClass> compReachableClsConsts;
+
+	public MultiMap<SootClass, SootClass> getCompReachableClsConsts() {
+		return this.compReachableClsConsts;
+	}
+
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -956,6 +962,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		}
 
 		this.compReachableObjs = jimpleClass.getCompReachableObjs();
+		this.compReachableClsConsts = jimpleClass.getCompReachableClsConsts();
 
 		// Make sure that we don't retain any weird Soot phases
 		PackManager.v().getPack("wjtp").remove("wjtp.lfp");
