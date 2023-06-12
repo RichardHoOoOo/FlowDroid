@@ -1043,6 +1043,22 @@ public abstract class AbstractCallbackAnalyzer {
 											Type type = ((ClassConstant) clsArg).toSootType();
 											if(type instanceof RefType) targetComponent = ((RefType) type).getSootClass();
 										} else if(clsArg instanceof StringConstant) targetComponent = Scene.v().getSootClassUnsafe(((StringConstant) clsArg).value);
+									} else if(! iExpr.getMethod().getDeclaringClass().getName().startsWith("android.") && ! iExpr.getMethod().getDeclaringClass().getName().startsWith("androidx.")) {
+										int numOfActivityClsConstant = 0;
+										SootClass activityClsConst = null;
+										for(Value arg: iExpr.getArgs()) {
+											if(arg instanceof ClassConstant) {
+												Type type = ((ClassConstant) arg).toSootType();
+												if(type instanceof RefType) {
+													SootClass clsConst = ((RefType) type).getSootClass();
+													if(this.activityNames.contains(clsConst.getName())) {
+														numOfActivityClsConstant++;
+														activityClsConst = clsConst;
+													}
+												}
+											}
+										}
+										if(numOfActivityClsConstant == 1 && (top.getDeclaringClass().getName().toLowerCase().contains("intentbuilder") || iExpr.getMethod().getName().toLowerCase().contains("startactivity"))) targetComponent = activityClsConst;
 									}
 									if(targetComponent != null) compReachableClsConsts.put(component, targetComponent);
 								}
