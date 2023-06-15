@@ -405,7 +405,9 @@ public abstract class AbstractCallbackAnalyzer {
 									continue;
 								}
 								SootClass targetClass = baseType.getSootClass();
-								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName())) callbackClasses.add(targetClass);
+								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName())) {
+									callbackClasses.add(targetClass);
+								}
 							}
 
 							// If we don't have pointsTo information, we take
@@ -519,6 +521,7 @@ public abstract class AbstractCallbackAnalyzer {
 			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,int,android.view.ViewGroup$LayoutParams)");
 			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View)");
 			isAddView |= iExpr.getMethod().getSubSignature().equals("void addView(android.view.View,int,int)");
+
 			if(! isAddView) continue;
 			Value view = iExpr.getArg(0);
 			Set<SootClass> components = findDeclaringComponents(method, false);
@@ -599,8 +602,9 @@ public abstract class AbstractCallbackAnalyzer {
 	 */
 	private boolean filterAccepts(SootClass lifecycleElement, SootClass targetClass) {
 		for (ICallbackFilter filter : callbackFilters) 
-			if (!filter.accepts(lifecycleElement, targetClass))
+			if (!filter.accepts(lifecycleElement, targetClass)) {
 				return false;
+			}
 		return true;
 	}
 

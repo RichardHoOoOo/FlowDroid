@@ -61,6 +61,11 @@ public class ComponentReachableMethods {
 		this.originalComponent = originalComponent;
 		this.unprocessedMethods = reachables.reader();
 		this.butterknifeUnbinderCls = butterknifeUnbinderCls;
+
+		for(SootMethod mtd: new ArrayList<>(originalComponent.getMethods())) {
+			if(mtd.isConcrete() && mtd.isConstructor() && ! entryPoints.contains(mtd)) entryPoints.add(mtd); // Do not forget to add constructors in a component into entry points
+		}
+		
 		addMethods(entryPoints.iterator());
 
 		SootClass viewBindingCls = Scene.v().getSootClassUnsafe(originalComponent.getName() + "_ViewBinding");
