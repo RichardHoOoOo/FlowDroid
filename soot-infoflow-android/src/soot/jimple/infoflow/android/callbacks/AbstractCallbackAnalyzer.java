@@ -693,8 +693,8 @@ public abstract class AbstractCallbackAnalyzer {
 			if (stmt.containsInvokeExpr()) {
 				final String className = stmt.getInvokeExpr().getMethod().getDeclaringClass().getName();
 				final String methodName = stmt.getInvokeExpr().getMethod().getName();
-				if(! className.equals("android.support.v4.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.BackStackRecord") && ! className.equals("android.support.v4.app.BackStackRecord")) continue;
-				if(! methodName.equals("add") && ! methodName.equals("replace")) continue;
+				if(! className.equals("android.support.v4.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.FragmentTransaction") && ! className.equals("androidx.fragment.app.BackStackRecord") && ! className.equals("android.support.v4.app.BackStackRecord") && ! className.equals("com.ncapdevi.fragnav.FragNavController")) continue;
+				if(! methodName.equals("add") && ! methodName.equals("replace") && ! methodName.equals("pushFragment$default") && ! methodName.equals("pushFragment")) continue;
 				for (int i = 0; i < stmt.getInvokeExpr().getArgCount(); i++) {
 					Value br = stmt.getInvokeExpr().getArg(i);
 
