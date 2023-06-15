@@ -156,9 +156,14 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final MultiMap<SootClass, SootClass> fragmentClasses = new HashMultiMap<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClassesRev = new HashMultiMap<>();
 	protected MultiMap<SootClass, SootClass> globalFragmentClasses = new HashMultiMap<>(); // A reference to the fragmentClasses in SetupApplication
+	protected MultiMap<SootClass, SootClass> globalFragmentClassesRev = new HashMultiMap<>();
 
 	public void setGlobalFragmentClasses(MultiMap<SootClass, SootClass> globalFragmentClasses) {
 		this.globalFragmentClasses = globalFragmentClasses;
+	}
+
+	public MultiMap<SootClass, SootClass> getGlobalFragmentClassesRev() {
+		return this.globalFragmentClassesRev;
 	}
 
 	protected final List<ICallbackFilter> callbackFilters = new ArrayList<>();
@@ -819,6 +824,18 @@ public abstract class AbstractCallbackAnalyzer {
 		return isComponent;
 	}
 
+	private boolean isFragment(SootClass cls) {
+		boolean isFrag = scFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scFragment.getType());
+		isFrag |= scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scAndroidXFragment.getType());
+		isFrag |= scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), scSupportFragment.getType());
+		return isFrag;
+	}
+
+	private boolean isActivity(SootClass cls) {
+		boolean isActivity = activityCls != null && Scene.v().getOrMakeFastHierarchy().canStoreType(cls.getType(), activityCls.getType());
+		return isActivity;
+	}
+
 	private boolean outerClassNotMatchesComponent(Set<SootClass> appComponents, SootClass currComponent, SootClass topCls) {
 		SootClass curCls = topCls;
 		Set<SootClass> visited = new HashSet<>();
@@ -848,6 +865,12 @@ public abstract class AbstractCallbackAnalyzer {
 		comp2IsFragment |= scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), scAndroidXFragment.getType());
 		comp2IsFragment |= scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(comp2.getType(), scSupportFragment.getType());
 		if(comp1IsActivity && comp2IsService) return true;
+		if(comp1IsFragment && comp2IsActivity) {
+			Set<SootClass> activities = this.globalFragmentClassesRev.get(comp1);
+			for(SootClass activity: activities) {
+				if(Scene.v().getOrMakeFastHierarchy().canStoreType(activity.getType(), comp2.getType())) return true;
+			}
+		}
 		return false;
 	}
 
@@ -958,6 +981,12 @@ public abstract class AbstractCallbackAnalyzer {
 		this.compReachableMtds.clear();
 		this.compReachableObjs.clear();
 		this.compReachableClsConsts.clear();
+
+		this.globalFragmentClassesRev.clear(); // Reconstruct globalFragmentClassesRev
+		for(SootClass activityCls: this.globalFragmentClasses.keySet()) {
+			Set<SootClass> fragClasses = this.globalFragmentClasses.get(activityCls);
+			for(SootClass fragCls: fragClasses) this.globalFragmentClassesRev.put(fragCls, activityCls);
+		}
 
 		// Add intentSetClassMethods
 		if(this.intentSetClassMethods.isEmpty() && this.componentSetClassMethods.isEmpty()) {
@@ -1096,7 +1125,18 @@ public abstract class AbstractCallbackAnalyzer {
 						
 						if(isInvalidInitInvokeFromDummyMain(top, edge.tgt())) continue;
 
-						if(preCompReachableObjs != null) {
+						boolean isCalledFromFragmentsEnclosingActivity = false;
+						if(this.isFragment(component) && this.isActivity(tgtCls)) {
+							Set<SootClass> activities = this.globalFragmentClassesRev.get(component);
+							for(SootClass activity: activities) {
+								if(Scene.v().getOrMakeFastHierarchy().canStoreType(activity.getType(), tgtCls.getType())) {
+									isCalledFromFragmentsEnclosingActivity = true;
+									break;
+								}
+							}
+						}
+
+						if(!isCalledFromFragmentsEnclosingActivity && preCompReachableObjs != null) {
 							Set<SootClass> reachableObjs = preCompReachableObjs.get(component);
 							if(reachableObjs != null && edge.srcStmt() != null && edge.srcStmt().containsInvokeExpr()) {
 								InvokeExpr iExpr = edge.srcStmt().getInvokeExpr();
@@ -1175,115 +1215,6 @@ public abstract class AbstractCallbackAnalyzer {
 		} while(changed);
 
 		this.compReachableObjs = compReachableObjs;
-	}
-
-
-	protected void reConstructCompReachableMtds_Org() {
-		this.compReachableMtds.clear();
-		this.compReachableObjs.clear();
-
-		Map<SootClass, SootMethod> components = new HashMap<>();
-		SootClass dummyMainCls = Scene.v().getSootClassUnsafe("dummyMainClass");
-		if(dummyMainCls == null) return;
-		for(SootMethod mtd: dummyMainCls.getMethods()) {
-			if(mtd.getName().startsWith("dummyMainMethod_")) {
-				Type rtnType = mtd.getReturnType();
-				if(rtnType instanceof RefType) {
-					SootClass rtnCls = ((RefType) rtnType).getSootClass();
-					components.put(rtnCls, mtd);
-				}
-			}
-		}
-
-		for(Map.Entry<SootClass, SootMethod> entry: components.entrySet()) {
-			SootClass component = entry.getKey();
-			SootMethod dummyMainMtd = entry.getValue();
-			Stack<SootMethod> stack = new Stack<>();
-			Stack<Boolean> isSingleOutEdgeStack = new Stack<>();
-			Set<String> visited = new HashSet<>();
-			stack.push(dummyMainMtd);
-			isSingleOutEdgeStack.push(true);
-			this.compReachableObjs.put(component, component); // Each component can new its self
-			while(! stack.isEmpty()) {
-				SootMethod top = stack.pop();
-				boolean isSingleOutEdge = isSingleOutEdgeStack.pop();
-				SootClass topCls = top.getDeclaringClass();
-				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && outerClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
-				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && classNotMatchesComponent(components.keySet(), component, topCls)) continue;
-				if(! top.isStatic() && ! top.isConstructor() && ! top.isStaticInitializer() && ! isSingleOutEdge && syntheticClassNotMatchesComponent(components.keySet(), component, topCls)) continue;
-				// if(isBackMethod(top)) continue;
-				String topClsName = topCls.getName();
-				String topMtdName = top.getName();
-				SootClass topMtdRtn = null;
-				Type rtnType = top.getReturnType();
-				if(rtnType instanceof RefType) topMtdRtn = ((RefType) rtnType).getSootClass();
-				if(! top.equals(dummyMainMtd) && topClsName.equals("dummyMainClass") && topMtdName.startsWith("dummyMainMethod_") && topMtdRtn != null) continue;
-				if(! visited.add(top.getSignature())) continue;
-				if(! top.equals(dummyMainMtd)) this.compReachableMtds.put(component, top.getSignature());
-				if(top.isConcrete() && ! topClsName.equals("dummyMainClass") && ! top.hasTag(SimulatedCodeElementTag.TAG_NAME)) {
-					// Scan the method units to find object that are initialized and put its class into compReachableObjs
-					Body body = top.retrieveActiveBody();
-					if(body != null) {
-						for(Unit u: body.getUnits()) {
-							if(! (u instanceof AssignStmt)) continue;
-							AssignStmt aStmt = (AssignStmt) u;
-							if(! (aStmt.getRightOp() instanceof NewExpr)) continue;
-							NewExpr nExpr = (NewExpr) aStmt.getRightOp();
-							this.compReachableObjs.put(component, nExpr.getBaseType().getSootClass());
-						}
-					}
-				}
-
-				List<Pair<Unit, List<SootMethod>>> allowedCalleeAtUnitPairs = new ArrayList<>();
-				List<Unit> units = new ArrayList<>();
-				Iterator<Edge> edges = Scene.v().getCallGraph().edgesOutOf(top);
-				while(edges.hasNext()) {
-					Edge edge = edges.next();
-					Unit unit = edge.srcUnit();
-					if(unit == null) continue;
-					if(units.contains(unit)) continue;
-					units.add(unit);
-					Stmt stmt = (Stmt) unit;
-					if(stmt.containsInvokeExpr()) {
-						SootMethod iMtd = stmt.getInvokeExpr().getMethod();
-						if(iMtd.isConstructor() || iMtd.isStatic() || iMtd.isStaticInitializer()) continue;
-						Pair<Unit, List<SootMethod>> pair = allowedCalleeAtUnit(component, iMtd, unit);
-						if(pair != null) allowedCalleeAtUnitPairs.add(pair);
-					}
-				}
-
-				edges = Scene.v().getCallGraph().edgesOutOf(top);
-				while(edges.hasNext()) {
-					Edge edge = edges.next();
-					SootClass tgtCls = edge.tgt().getDeclaringClass();
-					if(! tgtCls.getName().equals("dummyMainClass") && SystemClassHandler.v().isClassInSystemPackage(tgtCls.getName())) continue;
-					
-					if(isInvalidInitInvokeFromDummyMain(top, edge.tgt())) continue;
-
-					boolean notAllowedAtUnit = false;
-					if(edge.srcStmt() != null && edge.srcStmt().containsInvokeExpr() && edge.srcStmt().getInvokeExpr().getMethod().getName().equals(edge.tgt().getName())) {
-						for(Pair<Unit, List<SootMethod>> pair: allowedCalleeAtUnitPairs) {
-							if(pair.getO1().equals(edge.srcStmt()) && ! pair.getO2().contains(edge.tgt())) {
-								notAllowedAtUnit = true;
-								break;
-							}
-						}
-					}
-					if(notAllowedAtUnit) continue;
-			
-					int count = 0;
-					if(edge.srcUnit() != null) {
-						Iterator<Edge> itor = Scene.v().getCallGraph().edgesOutOf(edge.srcUnit());
-						while(itor.hasNext()) {
-							if(itor.next().tgt().getName().equals(edge.tgt().getName())) count++;
-						}
-					}
-					stack.push(edge.tgt());
-					if(count == 1) isSingleOutEdgeStack.push(true);
-					else isSingleOutEdgeStack.push(false);
-				}
-			}
-		}
 	}
 
 	private boolean isReachableObj(SootClass comp, SootClass obj) {

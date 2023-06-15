@@ -104,6 +104,11 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 	protected ISourceSinkDefinitionProvider sourceSinkProvider;
 	protected MultiMap<SootClass, AndroidCallbackDefinition> callbackMethods = new HashMultiMap<>();
 	protected MultiMap<SootClass, SootClass> fragmentClasses = new HashMultiMap<>();
+	protected MultiMap<SootClass, SootClass> globalFragmentClassesRev = new HashMultiMap<>();
+
+	public MultiMap<SootClass, SootClass> getGlobalFragmentClassesRev() {
+		return this.globalFragmentClassesRev;
+	} 
 
 	protected InfoflowAndroidConfiguration config = new InfoflowAndroidConfiguration();
 
@@ -963,6 +968,7 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 
 		this.compReachableObjs = jimpleClass.getCompReachableObjs();
 		this.compReachableClsConsts = jimpleClass.getCompReachableClsConsts();
+		this.globalFragmentClassesRev = jimpleClass.getGlobalFragmentClassesRev();
 
 		// Make sure that we don't retain any weird Soot phases
 		PackManager.v().getPack("wjtp").remove("wjtp.lfp");
