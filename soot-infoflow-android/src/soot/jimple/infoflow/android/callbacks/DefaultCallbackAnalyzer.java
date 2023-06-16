@@ -123,6 +123,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 						analyzeClassInterfaceCallbacks(sc, sc, sc);
 					}
 					reachableChangedListener = Scene.v().getReachableMethods().listener();
+					connectUnconnectedCallbacks();
 					logger.info("Callback analysis done.");
 				} else {
 					reConstructCompReachableMtds();
@@ -203,6 +204,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 						// Check for further callback declarations
 						analyzeReachableMethods(componentClass, entryClasses);
 					}
+					connectUnconnectedCallbacks();
 					logger.info("Incremental callback analysis done.");
 				}
 

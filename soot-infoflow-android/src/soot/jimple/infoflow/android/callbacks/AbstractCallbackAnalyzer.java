@@ -151,6 +151,7 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final Set<String> androidCallbacks;
 
 	protected final MultiMap<SootClass, AndroidCallbackDefinition> callbackMethods = new HashMultiMap<>();
+	protected final MultiMap<SootClass, SootClass> callbackClasses = new HashMultiMap<>();
 	protected final MultiMap<SootClass, Integer> layoutClasses = new HashMultiMap<>();
 	protected final Set<SootClass> dynamicManifestComponents = new HashSet<>();
 	protected final MultiMap<SootClass, SootClass> fragmentClasses = new HashMultiMap<>();
@@ -977,6 +978,34 @@ public abstract class AbstractCallbackAnalyzer {
 		return this.compReachableClsConsts;
 	}
 
+	// In case some initialized inner classes of a component is a callback class but it is not connected due to special reasons (i.e., 2-levels callbacks, field-put), we will connect it here 
+	protected void connectUnconnectedCallbacks() {
+		Set<SootClass> components = this.compReachableObjs.keySet();
+		for(SootClass component: components) {
+			Set<SootClass> reachableObjs = this.compReachableObjs.get(component);
+			Set<SootClass> callbackClses = this.callbackClasses.get(component);
+			for(SootClass reachableObj: reachableObjs) {
+				if(SystemClassHandler.v().isClassInSystemPackage(reachableObj.getName())) continue;
+				if(! reachableObj.getName().contains("$")) continue;
+				if(callbackClses.contains(reachableObj)) continue;
+				List<SootClass> outerClasses = getAllOuterClasses(reachableObj);
+				for(SootClass outerCls: outerClasses) {
+					if(Scene.v().getOrMakeFastHierarchy().canStoreType(component.getType(), outerCls.getType())) {
+						for(String cb: androidCallbacks) {
+							SootClass cbCls = Scene.v().getSootClassUnsafe(cb);
+							if(cbCls == null) continue;
+							if(Scene.v().getOrMakeFastHierarchy().canStoreType(reachableObj.getType(), cbCls.getType())) {
+								analyzeClassInterfaceCallbacks(reachableObj, reachableObj, component);
+								break;
+							}
+						}
+						break;
+					}
+				}
+			}
+		}
+	}
+
 	protected void reConstructCompReachableMtds() {
 		this.compReachableMtds.clear();
 		this.compReachableObjs.clear();
@@ -1609,7 +1638,9 @@ public abstract class AbstractCallbackAnalyzer {
 			for (SootMethod sm : sc.getMethods()) {
 				SootMethod callbackImplementation = getMethodFromHierarchyEx(baseClass, sm.getSubSignature());
 				if (callbackImplementation != null) {
-					checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType, baseClass);
+					if(checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType, baseClass)) {
+						this.callbackClasses.put(lifecycleElement, baseClass);
+					}
 				}
 			}
 		}
