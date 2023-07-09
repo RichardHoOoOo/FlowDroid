@@ -260,9 +260,10 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	}
 
 	@Override
-	protected void checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
+	protected boolean checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
+		boolean rtn = false;
 		if (!this.excludedEntryPoints.contains(componentClass)) {
-			super.checkAndAddFragment(componentClass, fragmentClass);
+			rtn = super.checkAndAddFragment(componentClass, fragmentClass);
 
 			for (SootMethod sm : fragmentClass.getMethods()) {
 				if (sm.isConstructor()
@@ -270,6 +271,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 					callbackWorklist.put(fragmentClass, sm);
 			}
 		}
+		return rtn;
 	}
 
 	Iterator<MethodOrMethodContext> rmIterator;

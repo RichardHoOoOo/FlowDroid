@@ -82,6 +82,7 @@ import soot.jimple.infoflow.android.callbacks.filters.ApplicationCallbackFilter;
 import soot.jimple.infoflow.android.callbacks.filters.AlienHostComponentFilter;
 import soot.jimple.NewExpr;
 import soot.jimple.StringConstant;
+import soot.jimple.Constant;
 
 import java.util.Stack;
 
@@ -149,6 +150,12 @@ public abstract class AbstractCallbackAnalyzer {
 	protected final InfoflowAndroidConfiguration config;
 	protected final Set<SootClass> entryPointClasses;
 	protected final Set<String> androidCallbacks;
+
+	protected final List<Pair<Unit, Set<SootClass>>> fragmentsResolvedAtUnits = new ArrayList<>();
+
+	public List<Pair<Unit, Set<SootClass>>> getFragmentsResolvedAtUnits() {
+		return this.fragmentsResolvedAtUnits;
+	}
 
 	protected final MultiMap<SootClass, AndroidCallbackDefinition> callbackMethods = new HashMultiMap<>();
 	protected final MultiMap<SootClass, SootClass> callbackClasses = new HashMultiMap<>();
@@ -677,6 +684,32 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 	}
 
+	protected void addFragmentResolvedAtAUnit(Unit u, int argIndex, SootClass fragCls) {
+		Stmt stmt = (Stmt) u;
+		if(stmt.getInvokeExpr().getArg(argIndex) instanceof Constant) return;
+		Type paraType = stmt.getInvokeExpr().getMethod().getParameterType(argIndex);
+		if((scSupportFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(paraType, scSupportFragment.getType())) || (scAndroidXFragment != null && Scene.v().getOrMakeFastHierarchy().canStoreType(paraType, scAndroidXFragment.getType()))) {
+			addFragmentResolvedAtAUnit(u, fragCls);
+		}
+	}
+
+	protected void addFragmentResolvedAtAUnit(Unit u, SootClass fragCls) {
+		boolean unitFound = false;
+		for(Pair<Unit, Set<SootClass>> pair: this.fragmentsResolvedAtUnits) {
+			if(pair.getO1() == u) {
+				unitFound = true;
+				pair.getO2().add(fragCls);
+				break;
+			}
+		}
+		if(! unitFound) {
+			Set<SootClass> fragClasses = new HashSet<>();
+			fragClasses.add(fragCls);
+			Pair<Unit, Set<SootClass>> pair = new Pair<>(u, fragClasses);
+			this.fragmentsResolvedAtUnits.add(pair);
+		}
+	}
+
 	/**
 	 * Checks whether the given method executes a fragment transaction that creates
 	 * new fragment
@@ -710,11 +743,19 @@ public abstract class AbstractCallbackAnalyzer {
 							// checkAndAddFragment(method.getDeclaringClass(), rt.getSootClass());
 							Set<SootClass> activities = findDeclaringComponents(method, true);
 							if(br instanceof ClassConstant)
-								for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
+								for(SootClass activity: activities) {
+									if(checkAndAddFragment(activity, rt.getSootClass())) {
+										addFragmentResolvedAtAUnit(u, i, rt.getSootClass());
+									}
+								}
 							else if(br instanceof Local) {
 								Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) br).possibleTypes();
 								if(possibleTypes.isEmpty()) {
-									for(SootClass activity: activities) checkAndAddFragment(activity, rt.getSootClass());
+									for(SootClass activity: activities) {
+										if(checkAndAddFragment(activity, rt.getSootClass())) {
+											addFragmentResolvedAtAUnit(u, i, rt.getSootClass());
+										}
+									}
 								} else {
 									for(Type possibleType: possibleTypes) {
 										if(possibleType instanceof RefType) {
@@ -726,10 +767,18 @@ public abstract class AbstractCallbackAnalyzer {
 														objReachable |= isReachableObj(frag, ((RefType) possibleType).getSootClass());
 													}
 												}
-												if(objReachable) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+												if(objReachable) {
+													if(checkAndAddFragment(activity, ((RefType) possibleType).getSootClass())) {
+														addFragmentResolvedAtAUnit(u, i, ((RefType) possibleType).getSootClass());
+													}
+												}
 											}
 										} else if (possibleType instanceof AnySubType) {
-											for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+											for(SootClass activity: activities) {
+												if(checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass())) {
+													addFragmentResolvedAtAUnit(u, i, ((AnySubType) possibleType).getBase().getSootClass());
+												}
+											}
 										}
 									}
 								}
@@ -759,7 +808,11 @@ public abstract class AbstractCallbackAnalyzer {
 					Set<SootClass> activities = findDeclaringComponents(method, true);
 					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) iinvExpr.getBase()).possibleTypes();
 					if(possibleTypes.isEmpty()) {
-						for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) iinvExpr.getBase().getType()).getSootClass());
+						for(SootClass activity: activities) {
+							if(checkAndAddFragment(activity, ((RefType) iinvExpr.getBase().getType()).getSootClass())) {
+								addFragmentResolvedAtAUnit(u, ((RefType) iinvExpr.getBase().getType()).getSootClass());
+							}
+						}
 					} else {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
@@ -771,10 +824,18 @@ public abstract class AbstractCallbackAnalyzer {
 											objReachable |= isReachableObj(frag, ((RefType) possibleType).getSootClass());
 										}
 									}
-									if(objReachable) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+									if(objReachable) {
+										if(checkAndAddFragment(activity, ((RefType) possibleType).getSootClass())) {
+											addFragmentResolvedAtAUnit(u, ((RefType) possibleType).getSootClass());
+										}
+									}
 								}
 							} else if (possibleType instanceof AnySubType) {
-								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+								for(SootClass activity: activities) {
+									if(checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass())) {
+										addFragmentResolvedAtAUnit(u, ((AnySubType) possibleType).getBase().getSootClass());
+									}
+								}
 							}
 						}
 					}
@@ -1010,6 +1071,7 @@ public abstract class AbstractCallbackAnalyzer {
 		this.compReachableMtds.clear();
 		this.compReachableObjs.clear();
 		this.compReachableClsConsts.clear();
+		this.fragmentsResolvedAtUnits.clear();
 
 		this.globalFragmentClassesRev.clear(); // Reconstruct globalFragmentClassesRev
 		for(SootClass activityCls: this.globalFragmentClasses.keySet()) {
@@ -1366,7 +1428,11 @@ public abstract class AbstractCallbackAnalyzer {
 				if (rv instanceof Local && rv.getType() instanceof RefType) {
 					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) rv).possibleTypes();
 					if(possibleTypes.isEmpty()) {
-						for(SootClass activity: activities) checkAndAddFragment(activity, ((RefType) rv.getType()).getSootClass());
+						for(SootClass activity: activities) {
+							if(checkAndAddFragment(activity, ((RefType) rv.getType()).getSootClass())) {
+								addFragmentResolvedAtAUnit(u, ((RefType) rv.getType()).getSootClass());
+							}
+						}
 					} else {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
@@ -1378,10 +1444,18 @@ public abstract class AbstractCallbackAnalyzer {
 											objReachable |= isReachableObj(frag, ((RefType) possibleType).getSootClass());
 										}
 									}
-									if(objReachable) checkAndAddFragment(activity, ((RefType) possibleType).getSootClass());
+									if(objReachable) {
+										if(checkAndAddFragment(activity, ((RefType) possibleType).getSootClass())) {
+											addFragmentResolvedAtAUnit(u, ((RefType) possibleType).getSootClass());
+										}
+									}
 								}
 							} else if (possibleType instanceof AnySubType) {
-								for(SootClass activity: activities) checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass());
+								for(SootClass activity: activities) {
+									if(checkAndAddFragment(activity, ((AnySubType) possibleType).getBase().getSootClass())) {
+										addFragmentResolvedAtAUnit(u, ((AnySubType) possibleType).getBase().getSootClass());
+									}
+								}
 							}
 						}
 					}
@@ -1730,11 +1804,12 @@ public abstract class AbstractCallbackAnalyzer {
 	 *                       fragment belongs
 	 * @param fragmentClass  The fragment class
 	 */
-	protected void checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
-		if(! fragmentClass.isConcrete()) return;
-		if(SystemClassHandler.v().isClassInSystemPackage(fragmentClass.getName())) return;
+	protected boolean checkAndAddFragment(SootClass componentClass, SootClass fragmentClass) {
+		if(! fragmentClass.isConcrete()) return false;
+		if(SystemClassHandler.v().isClassInSystemPackage(fragmentClass.getName())) return false;
 		this.fragmentClasses.put(componentClass, fragmentClass);
 		this.fragmentClassesRev.put(fragmentClass, componentClass);
+		return true;
 	}
 
 	private boolean isEmpty(Body activeBody) {
