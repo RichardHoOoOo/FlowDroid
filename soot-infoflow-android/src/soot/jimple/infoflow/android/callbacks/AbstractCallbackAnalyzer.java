@@ -157,6 +157,12 @@ public abstract class AbstractCallbackAnalyzer {
 		return this.fragmentsResolvedAtUnits;
 	}
 
+	protected final Map<SootClass, List<Pair<Unit, Map<Integer, Set<SootClass>>>>> callbacksResolvedAtUnits = new HashMap<>();
+
+	public Map<SootClass, List<Pair<Unit, Map<Integer, Set<SootClass>>>>> getCallbacksResolvedAtUnits() {
+		return this.callbacksResolvedAtUnits;
+	}
+
 	protected final MultiMap<SootClass, AndroidCallbackDefinition> callbackMethods = new HashMultiMap<>();
 	protected final MultiMap<SootClass, SootClass> callbackClasses = new HashMultiMap<>();
 	protected final MultiMap<SootClass, Integer> layoutClasses = new HashMultiMap<>();
@@ -382,7 +388,7 @@ public abstract class AbstractCallbackAnalyzer {
 			return;
 
 		// Iterate over all statement and find callback registration methods
-		Set<SootClass> callbackClasses = new HashSet<SootClass>();
+		Map<SootClass, List<Pair<Unit, Integer>>> callbackClasses = new HashMap<>();
 		for (Unit u : method.retrieveActiveBody().getUnits()) {
 			Stmt stmt = (Stmt) u;
 			// Callback registrations may not necessarily be instance invoke expressions
@@ -419,7 +425,12 @@ public abstract class AbstractCallbackAnalyzer {
 								}
 								SootClass targetClass = baseType.getSootClass();
 								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName())) {
-									callbackClasses.add(targetClass);
+									List<Pair<Unit, Integer>> unitList = callbackClasses.get(targetClass);
+									if(unitList == null) {
+										unitList = new ArrayList<>();
+										callbackClasses.put(targetClass, unitList);
+									}
+									unitList.add(new Pair<>(u, i));
 								}
 							}
 
@@ -438,8 +449,14 @@ public abstract class AbstractCallbackAnalyzer {
 								}
 
 								SootClass targetClass = baseType.getSootClass();
-								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName()))
-									callbackClasses.add(targetClass);
+								if (!SystemClassHandler.v().isClassInSystemPackage(targetClass.getName())) {
+									List<Pair<Unit, Integer>> unitList = callbackClasses.get(targetClass);
+									if(unitList == null) {
+										unitList = new ArrayList<>();
+										callbackClasses.put(targetClass, unitList);
+									}
+									unitList.add(new Pair<>(u, i));
+								}
 							}
 						}
 					}
@@ -449,10 +466,11 @@ public abstract class AbstractCallbackAnalyzer {
 
 		Set<SootClass> components = findDeclaringComponents(method, false);
 		// Analyze all found callback classes
-		for (SootClass callbackClass : callbackClasses) {
+		for(Map.Entry<SootClass, List<Pair<Unit, Integer>>> entry: callbackClasses.entrySet()) {
+			SootClass callbackClass = entry.getKey();
 			for(SootClass component: components) { // Check if the callback type can be initialized in methods that are reachable from the component, if not, the type resolved by pointsTo analysis may be a FP
 				if(isReachableObj(component, callbackClass)) {
-					analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component);
+					for(Pair<Unit, Integer> p: entry.getValue()) analyzeClassInterfaceCallbacks(callbackClass, callbackClass, component, p.getO1(), p.getO2());
 				}
 			}
 		}
@@ -498,15 +516,15 @@ public abstract class AbstractCallbackAnalyzer {
 				if (rv instanceof Local && rv.getType() instanceof RefType) {
 					Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) rv).possibleTypes();
 					if(possibleTypes.isEmpty()) {
-						for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) rv.getType()).getSootClass());
+						for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) rv.getType()).getSootClass(), u, -1);
 					} else {
 						for(Type possibleType: possibleTypes) {
 							if(possibleType instanceof RefType) {
 								for(SootClass component: components) {
-									if(isReachableObj(component, ((RefType) possibleType).getSootClass())) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+									if(isReachableObj(component, ((RefType) possibleType).getSootClass())) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass(), u, -1);
 								}
 							} else if (possibleType instanceof AnySubType) {
-								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass());
+								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass(), u, -1);
 							}
 						}
 					}
@@ -542,18 +560,18 @@ public abstract class AbstractCallbackAnalyzer {
 				Set<Type> possibleTypes = Scene.v().getPointsToAnalysis().reachingObjects((Local) view).possibleTypes();
 				if(possibleTypes.isEmpty()) {
 					if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) view.getType()).getSootClass().getName()))
-							for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) view.getType()).getSootClass());
+							for(SootClass component: components) checkAndAddViewCallbacks(component, ((RefType) view.getType()).getSootClass(), u, 0);
 				} else {
 					for(Type possibleType: possibleTypes) {
 						if(possibleType instanceof RefType) {
 							if (!SystemClassHandler.v().isClassInSystemPackage(((RefType) possibleType).getSootClass().getName())) {
 								for(SootClass component: components) {
-									if(isReachableObj(component, ((RefType) possibleType).getSootClass())) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass());
+									if(isReachableObj(component, ((RefType) possibleType).getSootClass())) checkAndAddViewCallbacks(component, ((RefType) possibleType).getSootClass(), u, 0);
 								}
 							}
 						} else if (possibleType instanceof AnySubType) {
 							if (!SystemClassHandler.v().isClassInSystemPackage(((AnySubType) possibleType).getBase().getSootClass().getName()))
-								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass());
+								for(SootClass component: components) checkAndAddViewCallbacks(component, ((AnySubType) possibleType).getBase().getSootClass(), u, 0);
 						}
 					}
 				}
@@ -561,7 +579,7 @@ public abstract class AbstractCallbackAnalyzer {
 		}
 	}
 
-	private void checkAndAddViewCallbacks(SootClass callbackClass, SootClass viewClass) {
+	private void checkAndAddViewCallbacks(SootClass callbackClass, SootClass viewClass, Unit u, int argIndex) {
 		Map<String, SootMethod> systemMethods = new HashMap<>(10000);
 		Set<SootClass> interfaces = collectAllInterfaces(viewClass);
 		for(SootClass i: interfaces) {
@@ -595,6 +613,7 @@ public abstract class AbstractCallbackAnalyzer {
 					if (parentMethod != null) {
 						addIntoCallbackToBaseMap(callbackClass, sm, viewClass);
 						this.callbackMethods.put(callbackClass, new AndroidCallbackDefinition(sm, parentMethod, CallbackType.Widget));
+						if(u != null) addCallbackResolvedAtAUnit(callbackClass, u, argIndex, viewClass);
 						systemMethods.remove(sm.getSubSignature());
 					}
 				}
@@ -707,6 +726,36 @@ public abstract class AbstractCallbackAnalyzer {
 			fragClasses.add(fragCls);
 			Pair<Unit, Set<SootClass>> pair = new Pair<>(u, fragClasses);
 			this.fragmentsResolvedAtUnits.add(pair);
+		}
+	}
+
+	protected void addCallbackResolvedAtAUnit(SootClass comp, Unit u, int argIndex, SootClass baseCls) {
+		List<Pair<Unit, Map<Integer, Set<SootClass>>>> unitList = this.callbacksResolvedAtUnits.get(comp);
+		if(unitList == null) {
+			unitList = new ArrayList<>();
+			this.callbacksResolvedAtUnits.put(comp, unitList);
+		}
+		boolean unitFound = false;
+		for(Pair<Unit, Map<Integer, Set<SootClass>>> pair: unitList) {
+			if(pair.getO1() == u) {
+				unitFound = true;
+				Map<Integer, Set<SootClass>> map = pair.getO2();
+				Set<SootClass> typeSet = map.get(argIndex);
+				if(typeSet == null) {
+					typeSet = new HashSet<>();
+					map.put(argIndex, typeSet);
+				}
+				typeSet.add(baseCls);
+				break;
+			}
+		}
+		if(! unitFound) {
+			Set<SootClass> typeSet = new HashSet<>();
+			typeSet.add(baseCls);
+			Map<Integer, Set<SootClass>> map = new HashMap<>();
+			map.put(argIndex, typeSet);
+			Pair<Unit, Map<Integer, Set<SootClass>>> pair = new Pair<>(u, map);
+			unitList.add(pair);
 		}
 	}
 
@@ -1056,7 +1105,7 @@ public abstract class AbstractCallbackAnalyzer {
 							SootClass cbCls = Scene.v().getSootClassUnsafe(cb);
 							if(cbCls == null) continue;
 							if(Scene.v().getOrMakeFastHierarchy().canStoreType(reachableObj.getType(), cbCls.getType())) {
-								analyzeClassInterfaceCallbacks(reachableObj, reachableObj, component);
+								analyzeClassInterfaceCallbacks(reachableObj, reachableObj, component, null, 0);
 								break;
 							}
 						}
@@ -1072,6 +1121,7 @@ public abstract class AbstractCallbackAnalyzer {
 		this.compReachableObjs.clear();
 		this.compReachableClsConsts.clear();
 		this.fragmentsResolvedAtUnits.clear();
+		this.callbacksResolvedAtUnits.clear();
 
 		this.globalFragmentClassesRev.clear(); // Reconstruct globalFragmentClassesRev
 		for(SootClass activityCls: this.globalFragmentClasses.keySet()) {
@@ -1643,7 +1693,7 @@ public abstract class AbstractCallbackAnalyzer {
 					// Check whether this is a real callback method
 					SootMethod parentMethod = systemMethods.get(method.getSubSignature());
 					if (parentMethod != null) {
-						if (checkAndAddMethod(method, parentMethod, sootClass, CallbackType.Default, sootClass)) {
+						if (checkAndAddMethod(method, parentMethod, sootClass, CallbackType.Default, sootClass, null, 0)) {
 							//We only keep the latest override in the class hierarchy
 							systemMethods.remove(parentMethod.getSubSignature());
 						}
@@ -1664,7 +1714,7 @@ public abstract class AbstractCallbackAnalyzer {
 	}
 
 	protected void analyzeClassInterfaceCallbacks(SootClass baseClass, SootClass sootClass,
-			SootClass lifecycleElement) {
+			SootClass lifecycleElement, Unit u, int argIndex) {
 		// We cannot create instances of abstract classes anyway, so there is no
 		// reason to look for interface implementations
 		if (!baseClass.isConcrete())
@@ -1686,14 +1736,14 @@ public abstract class AbstractCallbackAnalyzer {
 		// interface
 		SootClass superClass = sootClass.getSuperclassUnsafe();
 		if (superClass != null)
-			analyzeClassInterfaceCallbacks(baseClass, superClass, lifecycleElement);
+			analyzeClassInterfaceCallbacks(baseClass, superClass, lifecycleElement, u, argIndex);
 
 		// Do we implement one of the well-known interfaces?
 		for (SootClass i : collectAllInterfaces(sootClass)) {
-			this.checkAndAddCallback(i, baseClass, lifecycleElement);
+			this.checkAndAddCallback(i, baseClass, lifecycleElement, u, argIndex);
 		}
 		for (SootClass c : collectAllSuperClasses(sootClass)) {
-			this.checkAndAddCallback(c, baseClass, lifecycleElement);
+			this.checkAndAddCallback(c, baseClass, lifecycleElement, u, argIndex);
 		}
 	}
 
@@ -1706,13 +1756,13 @@ public abstract class AbstractCallbackAnalyzer {
 	 * @param baseClass        the class implementing/extending sc
 	 * @param lifecycleElement the component to which the callback method belongs
 	 */
-	private void checkAndAddCallback(SootClass sc, SootClass baseClass, SootClass lifecycleElement) {
+	private void checkAndAddCallback(SootClass sc, SootClass baseClass, SootClass lifecycleElement, Unit u, int argIndex) {
 		if (androidCallbacks.contains(sc.getName())) {
 			CallbackType callbackType = isUICallback(sc) ? CallbackType.Widget : CallbackType.Default;
 			for (SootMethod sm : sc.getMethods()) {
 				SootMethod callbackImplementation = getMethodFromHierarchyEx(baseClass, sm.getSubSignature());
 				if (callbackImplementation != null) {
-					if(checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType, baseClass)) {
+					if(checkAndAddMethod(callbackImplementation, sm, lifecycleElement, callbackType, baseClass, u, argIndex)) {
 						this.callbackClasses.put(lifecycleElement, baseClass);
 					}
 				}
@@ -1746,7 +1796,7 @@ public abstract class AbstractCallbackAnalyzer {
 	 * @return True if the method is new, i.e., has not been seen before, otherwise
 	 *         false
 	 */
-	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass, CallbackType callbackType, SootClass baseCls) {
+	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass, CallbackType callbackType, SootClass baseCls, Unit unit, int argIndex) {
 		// Do not call system methods
 		if (SystemClassHandler.v().isClassInSystemPackage(method.getDeclaringClass().getName()))
 			return false;
@@ -1767,6 +1817,7 @@ public abstract class AbstractCallbackAnalyzer {
 
 		boolean rtn = false;
 		addIntoCallbackToBaseMap(lifecycleClass, method, baseCls);
+		if(unit != null) addCallbackResolvedAtAUnit(lifecycleClass, unit, argIndex, baseCls);
 		if(this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(method, parentMethod, callbackType))) rtn = true;
 		if((method.getModifiers() & soot.Modifier.SYNTHETIC) != 0) {
 			Body body = method.retrieveActiveBody();
@@ -1786,6 +1837,7 @@ public abstract class AbstractCallbackAnalyzer {
 						}
 						// When 2 methods are declared in the same class and they have the same name and same parameters but different return types, we put iMtd into the call graph because soot seems cannot handle this type of synthetic method
 						if(allParaEquals) {
+							if(unit != null) addCallbackResolvedAtAUnit(lifecycleClass, unit, argIndex, baseCls);
 							addIntoCallbackToBaseMap(lifecycleClass, iMtd, baseCls);
 							if(this.callbackMethods.put(lifecycleClass, new AndroidCallbackDefinition(iMtd, parentMethod, callbackType))) rtn = true;
 						}

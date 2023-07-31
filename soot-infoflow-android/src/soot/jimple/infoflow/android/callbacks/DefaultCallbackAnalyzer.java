@@ -120,7 +120,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 
 						// Check for method overrides
 						analyzeMethodOverrideCallbacks(sc);
-						analyzeClassInterfaceCallbacks(sc, sc, sc);
+						analyzeClassInterfaceCallbacks(sc, sc, sc, null, 0);
 					}
 					reachableChangedListener = Scene.v().getReachableMethods().listener();
 					connectUnconnectedCallbacks();
@@ -191,7 +191,7 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 						for (SootClass activityComponent : activityComponents) {
 							if (activityComponent == null)
 								activityComponent = componentClass;
-							analyzeClassInterfaceCallbacks(componentClass, componentClass, activityComponent);
+							analyzeClassInterfaceCallbacks(componentClass, componentClass, activityComponent, null, 0);
 						}
 
 						// Collect all methods that we need to analyze
@@ -248,9 +248,9 @@ public class DefaultCallbackAnalyzer extends AbstractCallbackAnalyzer implements
 	}
 
 	@Override
-	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass, CallbackType callbackType, SootClass baseCls) {
+	protected boolean checkAndAddMethod(SootMethod method, SootMethod parentMethod, SootClass lifecycleClass, CallbackType callbackType, SootClass baseCls, Unit u, int argIndex) {
 		if (!this.excludedEntryPoints.contains(lifecycleClass)) {
-			if (super.checkAndAddMethod(method, parentMethod, lifecycleClass, callbackType, baseCls)) {
+			if (super.checkAndAddMethod(method, parentMethod, lifecycleClass, callbackType, baseCls, u, argIndex)) {
 				// Has this entry point been excluded?
 				this.callbackWorklist.put(lifecycleClass, method);
 				return true;
