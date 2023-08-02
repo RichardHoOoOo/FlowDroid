@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<summary fileFormatVersion="101">
+	<methods>
+		<method id="java.lang.String getString(int)">
+			<flows>
+				<flow isAlias="false">
+					<from sourceSinkType="Field"
+						AccessPath="[android.database.Cursor: java.lang.String stringValue]"
+						AccessPathTypes="[java.lang.String]" />
+					<to sourceSinkType="Return" />
+				</flow>
+			</flows>
+		</method>
+		<method id="double getDouble(int)">
+			<flows>
+				<flow isAlias="false">
+					<from sourceSinkType="Field"
+						AccessPath="[android.database.Cursor: double doubleValue]"
+						AccessPathTypes="[double]" />
+					<to sourceSinkType="Return" />
+				</flow>
+			</flows>
+		</method>
+		<method id="float getFloat(int)">
+			<flows>
+				<flow isAlias="false">
+					<from sourceSinkType="Field"
+						AccessPath="[android.database.Cursor: float floatValue]"
+						AccessPathTypes="[float]" />
+					<to sourceSinkType="Return" />
+				</flow>
+			</flows>
+		</method>
+		<method id="int getInt(int)">
+			<flows>
+				<flow isAlias="false">
+					<from sourceSinkType="Field"
+						AccessPath="[android.database.Cursor: int intValue]"
+						AccessPathTypes="[int]" />
+					<to sourceSinkType="Return" />
+				</flow>
+			</flows>
+		</method>
+		<method id="long getLong(int)">
+			<flows>
+				<flow isAlias="false">
+					<from sourceSinkType="Field"
+						AccessPath="[android.database.Cursor: long longValue]"
+						AccessPathTypes="[long]" />
+					<to sourceSinkType="Return" />
+				</flow>
+			</flows>
+		</method>
+		<method id="short getShort(int)">
+			<flows>
+				<flow isAlias="false">
+					<from sourceSinkType="Field"
+						AccessPath="[android.database.Cursor: short shortValue]"
+						AccessPathTypes="[short]" />
+					<to sourceSinkType="Return" />
+				</flow>
+			</flows>
+		</method>
+	</methods>
+</summary>
