@@ -208,12 +208,6 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		return this.fragmentsResolvedAtUnits;
 	}
 
-	public Map<SootClass, List<Pair<Unit, Map<Integer, Set<SootClass>>>>> callbacksResolvedAtUnits;
-
-	public Map<SootClass, List<Pair<Unit, Map<Integer, Set<SootClass>>>>> getCallbacksResolvedAtUnits() {
-		return this.callbacksResolvedAtUnits;
-	}
-
 	/**
 	 * Class for aggregating the data flow results obtained through multiple runs of
 	 * the data flow solver.
@@ -983,7 +977,6 @@ public class SetupApplication implements ITaintWrapperDataFlowAnalysis {
 		this.compReachableClsConsts = jimpleClass.getCompReachableClsConsts();
 		this.globalFragmentClassesRev = jimpleClass.getGlobalFragmentClassesRev();
 		this.fragmentsResolvedAtUnits = jimpleClass.getFragmentsResolvedAtUnits();
-		this.callbacksResolvedAtUnits = jimpleClass.getCallbacksResolvedAtUnits();
 
 		// Make sure that we don't retain any weird Soot phases
 		PackManager.v().getPack("wjtp").remove("wjtp.lfp");
